@@ -37,6 +37,8 @@
 #define DCHUBBUB_WHITELIST_BASE_ADDR_0 0x24878
 #define DCHUBBUB_WHITELIST_TOP_ADDR_0 0x2487c
 
+#define IOMMU_BASE 0xfdd80018
+
 #define MAXCPU 16
 
 void entry(void);
