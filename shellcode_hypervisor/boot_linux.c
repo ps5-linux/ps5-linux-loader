@@ -159,7 +159,7 @@ void entry(void) {
   }
 
   // Disable IOMMU.
-  *(volatile uint64_t *)IOMMU_BASE &= ~1;
+  *(volatile uint64_t *)(AMDIOMMU_MMIO_BASE + AMDIOMMU_CTRL) &= ~1;
 
   memcpy(&info, (void *)(cave_linux_info), sizeof(struct linux_info));
 
