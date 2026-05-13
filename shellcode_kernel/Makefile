@@ -13,7 +13,7 @@ TARGET  = shellcode_kernel.elf
 TEXT_BIN = shellcode_kernel.bin
 dump = shellcode_kernel.h
 
-SRC = main.c utils.c boot_linux.c
+SRC = $(wildcard *.c)
 OBJ = $(SRC:.c=.o)
 
 all: $(dump)

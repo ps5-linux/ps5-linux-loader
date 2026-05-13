@@ -1,8 +1,5 @@
 #include "utils.h"
-#include "shellcode_hv_args.h"
 #include <cpuid.h>
-
-extern shellcode_hv_args args;
 
 __attribute__((noinline, optimize("O0"))) uint32_t putc_uart(uint8_t tx_byte) {
   volatile uint32_t *uart_tx = (volatile uint32_t *)0xc1010104ULL;

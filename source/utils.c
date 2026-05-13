@@ -29,7 +29,7 @@ int setup_env(void) {
 }
 
 int set_offsets(void) {
-  fw = kernel_get_fw_version() >> 16;
+  fw = (kernel_get_fw_version() >> 0x10) & 0xFFFF;
   if (fw == 0)
     return -1;
   switch (fw) {
@@ -92,18 +92,18 @@ uint64_t getpmap(uint64_t proc) {
 }
 
 // for ring3
-uint64_t va_to_pa_user(uint64_t va) {
+uint64_t vtophys_user(uint64_t va) {
   uintptr_t self_pmap = getpmap(kernel_get_proc(getpid()));
   uintptr_t self_pml4 = get_pml4(self_pmap);
-  uint64_t pa = va_to_pa_custom(va, self_pml4 & 0xFFFFFFFF);
+  uint64_t pa = vtophys_custom(va, self_pml4 & 0xFFFFFFFF);
   return pa;
 }
 
 // for ring0
-uint64_t va_to_pa_kernel(uint64_t va) { return va_to_pa_custom(va, cr3); }
+uint64_t vtophys(uint64_t va) { return vtophys_custom(va, cr3); }
 
 // Source: PS5_kldload
-uint64_t va_to_pa_custom(uint64_t va, uint64_t cr3_custom) {
+uint64_t vtophys_custom(uint64_t va, uint64_t cr3_custom) {
   uint64_t table_phys = cr3_custom & 0xFFFFFFFF;
 
   for (int level = 0; level < 4; level++) {

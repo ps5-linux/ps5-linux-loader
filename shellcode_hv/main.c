@@ -1,4 +1,3 @@
-#include "main.h"
 #include "../include/config.h"
 #include "boot_linux.h"
 #include "utils.h"

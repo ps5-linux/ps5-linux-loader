@@ -2,8 +2,6 @@
 #include "../include/config.h"
 #include "../include/linux.h"
 #include "../shellcode_hv/shellcode_hv.h"
-#include "../shellcode_hv/shellcode_hv_args.h"
-#include "shellcode_kernel_args.h"
 #include "utils.h"
 #include <unistd.h>
 
@@ -86,12 +84,10 @@ static int mp3_enable_output(int be, int mode) {
   return mp3_invoke(22, mp3_req, mp3_rsp);
 }
 
-static void patch_hv(void) {
+static void install_hv_code(void) {
   // Install identity map for HV
   uint64_t identity_cr3 = cave_hv_paging;
-  uint64_t identity_pml4_0 =
-      identity_cr3 +
-      0x1003ULL;
+  uint64_t identity_pml4_0 = identity_cr3 + 0x1003ULL;
   uint64_t l40_l3_addr = PAGE_PA(identity_pml4_0); // addr PML4[0]
   uint64_t identity_pml40_l3[] = {
       0x0000000000000083, // P, RW, US=0 - 0 GB to 1 GB
@@ -108,44 +104,15 @@ static void patch_hv(void) {
     *(uint64_t *)PHYS_TO_DMAP(l40_l3_addr + i * 8) = identity_pml40_l3[i];
   }
 
-  // Install hv_shellcode 2
+  // Install shellcode_hv
   memcpy((void *)PHYS_TO_DMAP(cave_hv_code), shellcode_hv_bin,
          shellcode_hv_bin_len);
-
-  // Jump to shellcode final identity mapping
-  uint8_t shellcode_jmp[] = {
-      0x48, 0xC7, 0xC0, 0x00, 0x6F, 0x80, 0x62, // mov rax, 0x62806f00
-      0xFF, 0xE0, 0xC3, 0xC3, 0xC3, 0xC3, 0xC3, // jmp rax
-      0xC3, 0xC3};
-
-  // Update code cave in hv 1:1 region
-  *(uint32_t *)(&shellcode_jmp[3]) = (uint32_t)args.hv_code_cave_pa;
-
-  // Just patch the VMEXIT handler directly, avoiding all checks
-  memcpy((void *)PHYS_TO_DMAP(args.hv_handle_vmexit_pa), shellcode_jmp,
-         sizeof(shellcode_jmp));
-
-  uint8_t shellcode_identity_and_jmp[] = {
-      0x48, 0xB8, 0x00, 0x00, 0x00,
-      0x00, 0x01, 0x00, 0x00, 0x00, // movabs rax, 0x100000000
-      0x0F, 0x22, 0xD8,             // mov    cr3, rax
-      0x48, 0xB8, 0x00, 0x30, 0x00,
-      0x00, 0x01, 0x00, 0x00, 0x00, // movabs rax, 0x100003000
-      0xFF, 0xE0                    // jmp    rax
-  };
-
-  // Update CR3 PA (from config)
-  *(uint64_t *)(&shellcode_identity_and_jmp[2]) = cave_hv_paging;
-  // Update HV shellcode cave
-  *(uint64_t *)(&shellcode_identity_and_jmp[15]) = cave_hv_code;
-
-  // Install shellcode 1 to update CR3 and jump to main HV shellcode
-  memcpy((void *)PHYS_TO_DMAP(args.hv_code_cave_pa), shellcode_identity_and_jmp,
-         sizeof(shellcode_identity_and_jmp));
 }
 
 void boot_linux(void) {
-  patch_hv();
+
+  // Common bootloader code
+  install_hv_code();
 
   memcpy((void *)PHYS_TO_DMAP(0xC0000), (void *)g_vbios, 0x10000);
 

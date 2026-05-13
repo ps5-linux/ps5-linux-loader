@@ -352,7 +352,7 @@ int gpu_init_internal(void) {
   DEBUG_PRINT("[gpu] cmd_va      = 0x%lx\n", s_gpu.cmd_va);
 
   // Step 3: Get the physical address of the victim buffer
-  s_gpu.victim_real_pa = va_to_pa_user(s_gpu.victim_va);
+  s_gpu.victim_real_pa = vtophys_user(s_gpu.victim_va);
   DEBUG_PRINT("[gpu] victim_real_pa = 0x%lx\n", s_gpu.victim_real_pa);
 
   // Step 4: Walk GPU page tables to find the PTE for the victim buffer
@@ -413,7 +413,7 @@ int gpu_test(void) {
 
   // Test 1: Read a known kernel .data value via GPU DMA and compare
   uint64_t test_va = (uint64_t)KERNEL_ADDRESS_DATA_BASE;
-  uint64_t test_pa = va_to_pa_kernel(test_va);
+  uint64_t test_pa = vtophys(test_va);
   DEBUG_PRINT("[gpu] Test target: VA=0x%lx PA=0x%lx\n", test_va, test_pa);
 
   uint64_t kernel_val = kernel_getlong(test_va);
@@ -430,7 +430,7 @@ int gpu_test(void) {
   }
 
   // Test 2: Write and read-back test
-  uint64_t test_write_pa = va_to_pa_user(s_gpu.transfer_va + 0x100000);
+  uint64_t test_write_pa = vtophys_user(s_gpu.transfer_va + 0x100000);
   uint64_t magic = 0xDEADBEEFCAFEBABEULL;
 
   DEBUG_PRINT("[gpu] Write test: PA=0x%lx val=0x%lx\n", test_write_pa, magic);

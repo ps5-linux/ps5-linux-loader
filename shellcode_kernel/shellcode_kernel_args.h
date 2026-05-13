@@ -5,12 +5,12 @@
 #include <stdint.h>
 
 typedef struct {
-  uint32_t fw_version;
+  uint16_t fw_version;
   uint64_t ktext;
   uint64_t kdata;
   uint64_t dmap_base;
   uint64_t fun_printf;
-  uint64_t fun_va_to_pa;
+  uint64_t fun_vtophys;
   uint64_t fun_hv_iommu_set_buffers;
   uint64_t fun_hv_iommu_wait_completion;
   uint64_t fun_acpi_set_fw_waking_vector;
@@ -28,7 +28,6 @@ typedef struct {
   uint64_t kernel_uart_override;
   uint64_t hv_handle_vmexit_pa;
   uint64_t hv_code_cave_pa;
-  uint64_t hv_uart_override_pa;
   uint64_t linux_info_va; // To relocate by kernel shellcode
 } shellcode_kernel_args;
 

@@ -15,27 +15,23 @@ void memcpy(void *dest, void *src, uint64_t len) {
 
 uint64_t read_cr3(void) {
   uint64_t cr3;
-  __asm__ volatile("mov %%cr3, %0"
-                   : "=r"(cr3)
-                   :
-                   :
-  );
+  __asm__ volatile("mov %%cr3, %0" : "=r"(cr3) : :);
   return cr3;
 }
 
-uint64_t va_to_pa_kernel(uint64_t va) {
+uint64_t vtophys(uint64_t dmap, uint64_t va) {
   uint64_t cr3 = read_cr3();
-  return va_to_pa_custom(va, cr3);
+  return vtophys_custom(dmap, va, cr3);
 }
 
-uint64_t va_to_pa_custom(uint64_t va, uint64_t cr3_custom) {
+uint64_t vtophys_custom(uint64_t dmap, uint64_t va, uint64_t cr3_custom) {
   uint64_t table_phys = cr3_custom & 0xFFFFFFFF;
 
   for (int level = 0; level < 4; level++) {
     int shift = 39 - (level * 9);
     uint64_t idx = (va >> shift) & 0x1FF;
     uint64_t entry;
-    uint64_t entry_va = PHYS_TO_DMAP(PAGE_PA(table_phys) + idx * 8);
+    uint64_t entry_va = dmap + PAGE_PA(table_phys) + idx * 8;
 
     entry = *(uint64_t *)entry_va;
 
@@ -55,8 +51,7 @@ uint64_t va_to_pa_custom(uint64_t va, uint64_t cr3_custom) {
   return 0;
 }
 
-__attribute__((noinline, optimize("O0"))) uint32_t putc_uart(uint64_t dmap,
-                                                             uint8_t tx_byte) {
+uint32_t putc_uart(uint64_t dmap, uint8_t tx_byte) {
   volatile uint32_t *uart_tx = (uint32_t *)(dmap + 0xc1010104ULL);
   volatile uint32_t *uart_busy = (uint32_t *)(dmap + 0xc101010cULL);
   uint64_t timeout = 0xFFFFFFFF;
@@ -73,7 +68,7 @@ __attribute__((noinline, optimize("O0"))) uint32_t putc_uart(uint64_t dmap,
   return 0;
 }
 
-__attribute__((noinline, optimize("O0"))) int puts_uart(uint64_t dmap, const uint8_t *msg) {
+int puts_uart(uint64_t dmap, const uint8_t *msg) {
   uint32_t max = 255;
   int ret = 0;
 
@@ -88,4 +83,33 @@ __attribute__((noinline, optimize("O0"))) int puts_uart(uint64_t dmap, const uin
   }
 
   return ret;
+}
+
+void activate_uart(volatile shellcode_kernel_args *args_ptr) {
+  uint32_t *uart_va = (uint32_t *)(args_ptr->dmap_base + 0xC0115110ULL);
+  *uart_va &= ~0x200;
+  uint32_t *override_char_va = (uint32_t *)args_ptr->kernel_uart_override;
+  *override_char_va = 0x0;
+}
+
+void halt(void) { __asm__ __volatile__("hlt"); }
+
+void init_global_pointers(volatile shellcode_kernel_args *args_ptr) {
+  memcpy(&args, (void *)args_ptr, sizeof(args));
+
+  printf = (void (*)(const char *, ...))args.fun_printf;
+  smp_rendezvous = (void (*)(void (*)(void), void (*)(void), void (*)(void),
+                             void *))args.fun_smp_rendezvous;
+  smp_no_rendevous_barrier = (void (*)(void))args.fun_smp_no_rendevous_barrier;
+
+  transmitter_control = (int (*)(int, void *))args.fun_transmitter_control;
+  mp3_initialize = (int (*)(int))args.fun_mp3_initialize;
+  mp3_invoke = (int (*)(int, void *, void *))args.fun_mp3_invoke;
+  g_vbios = args.g_vbios;
+}
+
+void vmmcall_dummy(void) {
+  __asm__ volatile("mov $0x1, %rax \n"
+                   "vmmcall \n"
+                   "ret \n");
 }

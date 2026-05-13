@@ -1,8 +1,8 @@
-#include <unistd.h>
-#include "utils.h"
 #include "hv_defeat.h"
-#include "prepare_resume.h"
 #include "loader.h"
+#include "prepare_resume.h"
+#include "utils.h"
+#include <unistd.h>
 
 int main(void) {
   if (setup_env()) {

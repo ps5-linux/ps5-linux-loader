@@ -1,8 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "offsets.h"
 #include "linux.h"
+#include "offsets.h"
 #include <ps5/kernel.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -48,12 +48,12 @@ extern struct linux_info linux_i; // Declared on main.c
 
 int setup_env(void);
 
-static inline void kwrite_large(uint64_t ka, void* src, uint64_t len) {
+static inline void kwrite_large(uint64_t ka, void *src, uint64_t len) {
   uint32_t CHUNK = 0x1000;
   uint64_t written = 0;
   while (written < len) {
     uint32_t n = (len - written > CHUNK) ? CHUNK : (uint32_t)(len - written);
-    kernel_copyin(src + written,  ka + written, n);
+    kernel_copyin(src + written, ka + written, n);
     written += n;
   }
 }
@@ -136,9 +136,9 @@ enum page_bits {
 #define pmap_pde_index(va) ((va >> 21) & 0x1FF)
 #define pmap_pte_index(va) ((va >> 12) & 0x1FF)
 
-uint64_t va_to_pa_user(uint64_t va);
-uint64_t va_to_pa_kernel(uint64_t va);
-uint64_t va_to_pa_custom(uint64_t va, uint64_t cr3_custom);
+uint64_t vtophys_user(uint64_t va);
+uint64_t vtophys(uint64_t va);
+uint64_t vtophys_custom(uint64_t va, uint64_t cr3_custom);
 uint64_t pa_to_dmap(uint64_t pa);
 void page_chain_set_rw(uint64_t va);
 uint64_t page_remove_global(uint64_t va);

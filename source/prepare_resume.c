@@ -1,11 +1,11 @@
-#include <stdio.h>
-#include <stdint.h>
 #include "prepare_resume.h"
-#include "iommu.h"
 #include "../shellcode_kernel/shellcode_kernel.h"
 #include "../shellcode_kernel/shellcode_kernel_args.h"
+#include "iommu.h"
 #include "offsets.h"
 #include "utils.h"
+#include <stdint.h>
+#include <stdio.h>
 
 int prepare_resume(void) {
 
@@ -25,7 +25,7 @@ int prepare_resume(void) {
   kwrite_large(dest_text, shellcode_kernel_bin, shellcode_kernel_bin_len);
   prepare_sck_args(dest_data);
 
-  if(update_sck_data_ptr(shellcode_kernel_bin, dest_text, dest_data))
+  if (update_sck_data_ptr(shellcode_kernel_bin, dest_text, dest_data))
     return -1;
 
   hook_call_near(ktext + env_offset.HOOK_ACPI_WAKEUP_MACHDEP, dest_text);
@@ -36,7 +36,7 @@ int prepare_resume(void) {
   return 0;
 }
 
-int update_sck_data_ptr (void* sc, uint64_t dest_text, uint64_t dest_data) {
+int update_sck_data_ptr(void *sc, uint64_t dest_text, uint64_t dest_data) {
   // Find the address 0x11AA11AA11AA11AA used as marker
   int offset = -1;
   for (int i = 0; i < 0x40; i++) {
@@ -55,7 +55,8 @@ int update_sck_data_ptr (void* sc, uint64_t dest_text, uint64_t dest_data) {
 
 void hook_call_near(uint64_t hook, uint64_t dst) {
   int64_t diff_call = dst - hook;
-  uint8_t new_instr[5]; new_instr[0] = 0xE8;
+  uint8_t new_instr[5];
+  new_instr[0] = 0xE8;
   *((uint32_t *)&new_instr[1]) = (int32_t)(diff_call - 5);
   kernel_copyin(new_instr, hook, 5);
   DEBUG_PRINT("Instruction patched\n");
@@ -63,13 +64,12 @@ void hook_call_near(uint64_t hook, uint64_t dst) {
 
 void prepare_sck_args(uint64_t dest_data) {
   shellcode_kernel_args args;
-  args.fw_version = kernel_get_fw_version() & 0xFFFF0000;
+  args.fw_version = fw;
   args.ktext = ktext;
   args.kdata = kdata;
   args.dmap_base = dmap;
 
   args.fun_printf = ktext + env_offset.FUN_PRINTF;
-  args.fun_va_to_pa = ktext + env_offset.FUN_VA_TO_PA;
   args.fun_hv_iommu_set_buffers = ktext + env_offset.FUN_HV_IOMMU_SET_BUFFERS;
   args.fun_hv_iommu_wait_completion =
       ktext + env_offset.FUN_HV_IOMM_WAIT_COMPLETION;
@@ -91,7 +91,6 @@ void prepare_sck_args(uint64_t dest_data) {
   args.kernel_uart_override = ktext + env_offset.KERNEL_UART_OVERRIDE;
   args.hv_handle_vmexit_pa = env_offset.HV_HANDLE_VMEXIT_PA;
   args.hv_code_cave_pa = env_offset.HV_CODE_CAVE_PA;
-  args.hv_uart_override_pa = env_offset.HV_UART_OVERRIDE_PA;
 
   args.linux_info_va = linux_i.linux_info;
 

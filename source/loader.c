@@ -28,7 +28,7 @@ uint64_t alloc_page(void) {
   // Fault it to force physical allocation
   *(uint8_t *)page = 0;
 
-  return va_to_pa_user((uintptr_t)page);
+  return vtophys_user((uintptr_t)page);
 }
 
 void install_page(uintptr_t pml4, vm_offset_t va, vm_paddr_t pa, int bits) {
@@ -273,12 +273,12 @@ int fetch_linux(struct linux_info *info) {
 
   for (int i = 0; i < bzimage_size; i += PAGE_SIZE) {
     install_page(syscore_pml4, info->bzimage + i,
-                 va_to_pa_user((uintptr_t)bzimage + i), 0);
+                 vtophys_user((uintptr_t)bzimage + i), 0);
   }
 
   for (int i = 0; i < initrd_size; i += PAGE_SIZE) {
     install_page(syscore_pml4, info->initrd + i,
-                 va_to_pa_user((uintptr_t)initrd + i), 0);
+                 vtophys_user((uintptr_t)initrd + i), 0);
   }
 
   return 0;
