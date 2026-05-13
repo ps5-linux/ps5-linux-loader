@@ -16,9 +16,9 @@ void memcpy(void *dest, void *src, uint64_t len) {
 uint64_t read_cr3(void) {
   uint64_t cr3;
   __asm__ volatile("mov %%cr3, %0"
-                   : "=r"(cr3) // Output: move CR3 into the variable 'cr3'
-                   :           // No inputs
-                   :           // No clobbered registers
+                   : "=r"(cr3)
+                   :
+                   :
   );
   return cr3;
 }

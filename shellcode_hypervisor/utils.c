@@ -96,12 +96,10 @@ void wrmsr(uint32_t msr, uint64_t val) {
   __asm__ __volatile__("wrmsr" : : "a"(low), "d"(high), "c"(msr));
 }
 
-// Map FreeBSD atomic_add_32 to GCC builtin
 void atomic_add_32(volatile uint32_t *p, uint32_t v) {
   __sync_fetch_and_add(p, v);
 }
 
-// Map FreeBSD atomic_cmpset_32 to GCC builtin
 int atomic_cmpset_32(volatile uint32_t *dst, uint32_t exp, uint32_t src) {
   return __sync_bool_compare_and_swap(dst, exp, src);
 }

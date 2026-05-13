@@ -17,6 +17,16 @@ uint64_t cr3;
 uint32_t fw;
 struct linux_info linux_i;
 
+int setup_env(void) {
+  notify("Welcome to ps5-linux-loader. We'll defeat HV and prepare the system "
+         "to boot Linux on sleep resume.\n");
+  if (set_offsets())
+    return -1;
+  if (init_global_vars())
+    return -1;
+  return 0;
+}
+
 int set_offsets(void) {
   fw = kernel_get_fw_version() >> 16;
   if (fw == 0)
