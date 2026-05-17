@@ -6,13 +6,14 @@
 
 ## PS5 firmware
 
-*ps5-linux* is currently only supported on PS5 Phat on 3.xx and 4.xx firmwares.
+*ps5-linux* is currently only supported on PS5 Phat on the following firmwares:
 
 - **3.00**, **3.10**, **3.20**, **3.21** without M.2 support
 - **4.00**, **4.02**, **4.03**, **4.50**, **4.51** with M.2 support
 - **5.50** with M.2 support
 - **6.00**, **6.02** with M.2 support
-- Support for 1.xx and 2.xx firmwares may be added in the future, but we will not prioritize this effort.
+
+Support for 1.xx and 2.xx firmwares may be added in the future, but we will not prioritize this effort.
 
 If you want to update to a specific firmware, [download the correct PUP](https://darthsternie.net/ps5-firmwares/) and follow the [official guide](https://www.playstation.com/en-us/support/hardware/reinstall-playstation-system-software-safe-mode) to upgrade your PS5. Obviously you cannot downgrade.
 
