@@ -1,6 +1,6 @@
 # ps5-linux
 
-**ps5-linux** leverages a patched HV vulnerability to transform your PS5 Phat console running **3.00-6.02 firmwares** into a highly capable Linux PC, unlocking its full hardware potential for desktop use. Powered by 8 CPU cores (16 threads) at **3.5 GHz** and a GPU at **2.23 GHz**, it provides enough performance to run Steam games and various emulators with impressive fluidity. It supports HDMI 4K60 video and audio output. Furthermore, it allows you to utilize an **M.2 SSD** as a dedicated Linux partition, as well as all USB ports on the console.
+**ps5-linux** leverages a patched HV vulnerabilities to transform your PS5 Phat console running **3.00-6.02 firmwares** into a highly capable Linux PC, unlocking its full hardware potential for desktop use. Powered by 8 CPU cores (16 threads) at **3.5 GHz** and a GPU at **2.23 GHz**, it provides enough performance to run Steam games and various emulators with impressive fluidity. It supports HDMI 4K60 video and audio output. Furthermore, it allows you to utilize an **M.2 SSD** as a dedicated Linux partition, as well as all USB ports on the console.
 
 ![Alt Text](logo.webp)
 
@@ -47,9 +47,15 @@ If you reset your PS5 settings or reinstall the FW, you need to reapply these se
 
 #### Pre-built images
 
-You can download them from [ps5-linux-image](https://github.com/ps5-linux/ps5-linux-image/releases/tag/latest). Recommended is `ps5-ubuntu2604.img.xz`.
+You can download them from [ps5-linux-image](https://github.com/ps5-linux/ps5-linux-image/releases/tag/latest). Recommended is `ps5-ubuntu2604.img.xz`. Unpack the `.xz` file.
 
-#### Linux/macOS:
+#### Build your own image
+
+If you use Windows,  run this in PowerShell or CMD as administrator to install WSL
+
+```bash
+wsl --install
+```
 
 Install docker:
 
@@ -58,38 +64,6 @@ sudo apt update
 sudo apt install docker.io -y
 sudo service docker start
 sudo usermod -aG docker $USER
-```
-
-Restart the terminal.
-
-```bash
-git clone https://github.com/ps5-linux/ps5-linux-image
-cd ps5-linux-image
-chmod +x ./build_image.sh
-./build_image.sh --distro ubuntu2604
-```
-
-#### Windows (WSL2):
-
-If WSL2 is not installed yet, run this in PowerShell or CMD as administrator, then restart:
-
-```bash
-wsl --install
-```
-
-Then open WSL and set up Docker:
-
-```bash
-sudo apt update
-sudo apt install docker.io -y
-sudo service docker start
-sudo usermod -aG docker $USER
-```
-
-Restart WSL from PowerShell/CMD:
-
-```bash
-wsl --shutdown
 ```
 
 Then clone and build:
