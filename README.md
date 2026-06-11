@@ -312,7 +312,7 @@ Join our [Discord server](https://discord.gg/PeMGVB7BAm) to celebrate Linux on P
 - [resulknad](https://github.com/resulknad): [ps5-linux-image](https://github.com/ps5-linux/ps5-linux-image)
 - [rmuxnet](https://github.com/rmuxnet): [ps5 ethernet driver](https://github.com/ps5-linux/ps5-linux-patches/commit/643e214d7bd37f292045fc0dbb821e421f7a3e47)
 - [fail0verflow](https://github.com/fail0verflow): [prosperous](https://github.com/fail0verflow/prosperous)
-- [flatz](github.com/flatz): [HV exploit](https://gist.github.com/flatz/620ddda6d64acca6d1c990dc3080ac0e)
+- [flatz](https://github.com/flatz): [HV exploit](https://gist.github.com/flatz/620ddda6d64acca6d1c990dc3080ac0e)
 - [cragson](https://github.com/cragson): [HV expoit implementation](https://github.com/cragson/ps5-hen)
 - [john-tornblom](https://github.com/john-tornblom): [PS5 SDK](https://github.com/ps5-payload-dev/sdk)
 - [echostretch](https://github.com/echostretch): Offsets and testing
