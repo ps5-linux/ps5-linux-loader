@@ -1,3 +1,4 @@
+#include "fw_1340_porting.h"
 #include "hv_defeat_0304.h"
 #include "hv_defeat_0506.h"
 #include "loader.h"
@@ -31,6 +32,7 @@ int main(void) {
     if (hv_defeat_0506(shellcode_kernel, shellcode_kernel_len))
       goto err;
   } else {
+    notify_fw_1340_porting_status(fw);
     goto err;
   }
 

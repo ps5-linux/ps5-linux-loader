@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "fw_1340_porting.h"
 #include "linux.h"
 #include "offsets.h"
 #include <stdio.h>
@@ -77,6 +78,7 @@ int set_offsets(void) {
     env_offset = off_0602;
     break;
   default:
+    notify_fw_1340_porting_status(fw);
     return -1;
   }
   return 0;
