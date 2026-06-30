@@ -23,6 +23,10 @@ Features:
 - **6.00**, **6.02** with M.2 support
 - **7.61** with M.2 support
 
+Additionally *ps5-linux* is currently only supported on PS5 Slim on the following firmwares:
+
+- **7.61** with M.2 support
+- 
 Support for 1.xx and 2.xx firmwares may be added in the future, but we will not prioritize this effort.
 
 If you want to update to a specific firmware, [download the correct PUP](https://darthsternie.net/ps5-firmwares/) and follow the [official guide](https://www.playstation.com/en-us/support/hardware/reinstall-playstation-system-software-safe-mode) to upgrade your PS5. **Obviously you cannot downgrade.**
