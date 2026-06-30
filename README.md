@@ -260,7 +260,7 @@ For any future ps5-linux updates, you can download the `.deb` or `.pkg.tar.zst` 
 
 ## FAQ
 
-- Q: Will higher >=6.50 firmwares be supported?
+- Q: Will higher >=7.61 firmwares be supported?
   - A: No.
 - Q: Why can I not use M.2 on 3.xx?
   - A: Because the PS5 fails to boot with it attached.
