@@ -29,7 +29,7 @@ static void setidt(int idx, uintptr_t func, int typ, int dpl, int ist) {
 }
 
 static uint64_t get_hv_stack(void) {
-  if (fw == 0x0720 || fw == 0x0761) {
+  if (fw >= 0x0720 || fw < 0x0800) {
     return 0x628ec000;
   }
   return -1;
