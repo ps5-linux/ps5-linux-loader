@@ -32,6 +32,9 @@ static uint64_t get_hv_stack(void) {
   if (fw >= 0x0720 && fw < 0x0800) {
     return 0x628ec000;
   }
+  if (fw == 0x0650) {
+    return 0x628d0000;
+  }
   return -1;
 }
 
@@ -84,11 +87,30 @@ static void build_sx_rop(uintptr_t ist, size_t shellcode_kernel_len) {
   kwrite(ist + 0x1000, rop_buf, (uintptr_t)rop - (uintptr_t)rop_buf);
 }
 
+static int update_sc_fw_version(uint64_t shellcode) {
+  // Find the address 0x11AA11AA used as marker
+  int offset = -1;
+  for (uint64_t i = 0; i < 0x40; i++) {
+    if (*(uint32_t *)(shellcode + i) == 0x11AA11AA) {
+      offset = i;
+      break;
+    }
+  }
+  if (offset == -1) {
+    notify("Could not find offset of shellcode fw version - Aborting\n");
+    return -1;
+  }
+  *(uint32_t *)(shellcode + offset) = fw;
+  return 0;
+}
+
 int hv_defeat_0607(void *shellcode_kernel, size_t shellcode_kernel_len) {
   void *shellcode_0607 =
       mmap(NULL, ALIGN_UP(shellcode_0607_bin_len, PAGE_SIZE),
            PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   memcpy(shellcode_0607, shellcode_0607_bin, shellcode_0607_bin_len);
+
+  if(update_sc_fw_version((uint64_t) shellcode_0607)) return -1;
 
   for (int i = 0; i < shellcode_0607_bin_len; i += PAGE_SIZE) {
     install_page_syscore(kernel_cave_shellcode_0761 + i,

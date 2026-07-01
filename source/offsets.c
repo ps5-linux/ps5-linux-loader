@@ -466,6 +466,50 @@ offset_list off_0602 = {
     .PS5_WIFI_FW_SIZE = 494536,
 };
 
+offset_list off_0650 = {
+    // .IOMMU_SOFTC not needed
+    // .VMSPACE_VM_VMID not needed
+    .VMSPACE_VM_PMAP = 0x1D8,
+    // .DATA_BASE_GVMSPACE not needed
+    .ACPIGBL_FACS = (0xffffffff83c04540 - KERNEL_TEXT),
+    .IDT = (0xffffffff873cdde0 - KERNEL_TEXT),
+    .COMMON_TSS = (0xffffffff873d0a00 - KERNEL_TEXT),
+    // .STOPPED_CPUS not needed
+    // .FUN_STOP_CPUS not needed
+    // .FUN_AS_LAPIC_EOI not needed
+    // .FUN_HV_UNMAP_PT_TMR not needed
+    .FUN_MEMCPY = (0xffffffff804935b0 - KERNEL_TEXT),
+    .GAD_ADD_RSP_28_POP_RBP_RET = (0xffffffff80bb7224 - KERNEL_TEXT),
+    .GAD_IRETQ = (0xffffffff804547ed - KERNEL_TEXT),
+    .GAD_POP_RAX_RET = (0xffffffff8040eb50 - KERNEL_TEXT),
+    .GAD_POP_RDI_RET = (0xffffffff803f1ef8 - KERNEL_TEXT),
+    .GAD_POP_RSI_RET = (0xffffffff803b2a30 - KERNEL_TEXT),
+    .GAD_POP_RDX_RET = (0xffffffff80536a32 - KERNEL_TEXT),
+    //.GAD_POP_RCX_RET = (0xffffffff8033ba53 - KERNEL_TEXT),
+    .GAD_POP_RCX_RET = (0xffffffff804e68b8 - KERNEL_TEXT),
+    .GAD_POP_RSP_RET = (0xffffffff8045a830 - KERNEL_TEXT),
+    .GAD_MOV_QWORD_PTR_RDI_RSI_POP_RBP_RET = (0xffffffff8061421a - KERNEL_TEXT),
+    .GAD_WRMSR_RET = (0xffffffff80451e84 - KERNEL_TEXT),
+    // .GAD_MOV_QWORD_PTR_RDI_RSI_POP_RBP_RET not needed
+    // .HOOK_ACPI_WAKEUP_MACHDEP not needed
+    .KERNEL_CODE_CAVE = 0x500,
+    .FUN_PRINTF = (0xffffffff806d2610 - KERNEL_TEXT),
+    // .FUN_HV_IOMMU_SET_BUFFERS not needed
+    // .FUN_HV_IOMM_WAIT_COMPLETION not needed
+    .FUN_SMP_RENDEZVOUS = (0xffffffff80cd20e0 - KERNEL_TEXT),
+    .FUN_SMP_NO_RENDEVOUS_BARRIER = (0xffffffff804bc370 - KERNEL_TEXT),
+    .HV_CODE_CAVE_PA = 0x62806F00,
+    .HV_HANDLE_VMEXIT_PA = 0x62841D50,
+    .KERNEL_UART_OVERRIDE = (0xffffffff822d25c8 - KERNEL_TEXT),
+    .KERNEL_CFI_CHECK = (0xffffffff80689a20 - KERNEL_TEXT),
+    .G_VBIOS = (0xffffffff875dfa50 - KERNEL_TEXT),
+    .FUN_TRANSMITTER_CONTROL = (0xffffffff80dcb990 - KERNEL_TEXT),
+    .FUN_MP3_INITIALIZE = (0xffffffff80be4190 - KERNEL_TEXT),
+    .FUN_MP3_INVOKE = (0xffffffff80be2f10 - KERNEL_TEXT),
+    .PS5_WIFI_FW_OFFSET = (0xffffffff81665b90 - KERNEL_TEXT),
+    .PS5_WIFI_FW_SIZE = 494536,
+};
+
 offset_list off_0720 = {
     // .IOMMU_SOFTC not needed
     // .VMSPACE_VM_VMID not needed
