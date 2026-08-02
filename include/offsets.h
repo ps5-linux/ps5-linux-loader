@@ -20,10 +20,13 @@ typedef struct _offset_list {
   uint64_t FUN_MEMCPY;
   uint64_t GAD_ADD_RSP_28_POP_RBP_RET;
   uint64_t GAD_IRETQ;
+  uint64_t GAD_POP_RAX_RET;
   uint64_t GAD_POP_RDI_RET;
   uint64_t GAD_POP_RSI_RET;
   uint64_t GAD_POP_RDX_RET;
+  uint64_t GAD_POP_RCX_RET;
   uint64_t GAD_POP_RSP_RET;
+  uint64_t GAD_WRMSR_RET;
   uint64_t GAD_MOV_QWORD_PTR_RDI_RSI_POP_RBP_RET;
   /* Shellcode Kernel */
   uint64_t HOOK_ACPI_WAKEUP_MACHDEP;
@@ -64,5 +67,10 @@ extern offset_list off_0510;
 extern offset_list off_0550;
 extern offset_list off_0600;
 extern offset_list off_0602;
+extern offset_list off_0650;
+extern offset_list off_0720;
+extern offset_list off_0740;
+extern offset_list off_0760;
+extern offset_list off_0761;
 
 #endif

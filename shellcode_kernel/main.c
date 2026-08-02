@@ -28,7 +28,7 @@ __attribute__((section(".entry_point"))) uint32_t main(uint64_t add1,
     if (hv_defeat_0304(args_ptr))
       return -1;
   } else if ((0x0500 <= args_ptr->fw_version) &&
-             (args_ptr->fw_version < 0x0650)) {
+             (args_ptr->fw_version < 0x0800)) {
     // Already escaped.
   } else {
     return 0;

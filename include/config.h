@@ -20,7 +20,8 @@
 // This is used as transitional storage from ProsperoOS to Kernel shellcode
 #define kernel_cave 0xFFFF800000000000
 #define kernel_cave_shellcode kernel_cave
-#define kernel_cave_files kernel_cave_shellcode + PAGE_SIZE + PAGE_SIZE
+#define kernel_cave_shellcode_0761 kernel_cave_shellcode + PAGE_SIZE + PAGE_SIZE
+#define kernel_cave_files kernel_cave_shellcode_0761 + PAGE_SIZE
 #define kernel_cave_linux_info kernel_cave_files
 #define kernel_cave_bzImage kernel_cave_linux_info + PAGE_SIZE
 

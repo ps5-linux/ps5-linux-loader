@@ -1,5 +1,6 @@
 #include "hv_defeat_0304.h"
 #include "hv_defeat_0506.h"
+#include "hv_defeat_0607.h"
 #include "loader.h"
 #include "prepare_resume.h"
 #include "utils.h"
@@ -29,6 +30,9 @@ int main(void) {
       goto err;
   } else if ((0x0500 <= fw) && (fw < 0x0650)) {
     if (hv_defeat_0506(shellcode_kernel, shellcode_kernel_len))
+      goto err;
+  } else if ((0x0650 <= fw) && (fw < 0x0800)) {
+    if (hv_defeat_0607(shellcode_kernel, shellcode_kernel_len))
       goto err;
   } else {
     goto err;

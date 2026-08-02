@@ -79,7 +79,7 @@ static inline uint64_t vmmcall(uint64_t nr, uint64_t a0, uint64_t a1,
 static uint64_t get_hv_shm(void) {
   if (args.fw_version >= 0x0500 && args.fw_version < 0x0600) {
     return 0x62a01000;
-  } else if (args.fw_version >= 0x0600 && args.fw_version < 0x0650) {
+  } else if (args.fw_version >= 0x0600 && args.fw_version < 0x0800) {
     return 0x62a22000;
   }
   return -1;
@@ -188,7 +188,7 @@ void boot_linux(void) {
   memcpy(&info, (void *)args.linux_info_va, sizeof(struct linux_info));
 
   info.n_tmrs = 0;
-  if (args.fw_version >= 0x0500 && args.fw_version < 0x0650) {
+  if (args.fw_version >= 0x0500 && args.fw_version < 0x0800) {
     SceSblHvShm *shm = (SceSblHvShm *)PHYS_TO_DMAP(get_hv_shm());
 
     for (int i = 0; i < 64; i++) {
