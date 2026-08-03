@@ -238,6 +238,7 @@ offset_list off_0500 = {
     .GAD_POP_RSI_RET = (0xffffffff803a92b0 - KERNEL_TEXT),
     .GAD_POP_RDX_RET = (0xffffffff8040dafc - KERNEL_TEXT),
     // .GAD_POP_RCX_RET not needed
+	.GAD_POP_RSP_RET = (0xffffffff804510b0 - KERNEL_TEXT),
     // .GAD_WRMSR_RET not needed
     .GAD_MOV_QWORD_PTR_RDI_RSI_POP_RBP_RET = (0xffffffff80603c0a - KERNEL_TEXT),
     // .HOOK_ACPI_WAKEUP_MACHDEP not needed
@@ -279,6 +280,7 @@ offset_list off_0502 = {
     .GAD_POP_RSI_RET = (0xffffffff803a92b0 - KERNEL_TEXT),
     .GAD_POP_RDX_RET = (0xffffffff8054d532 - KERNEL_TEXT),
     // .GAD_POP_RCX_RET not needed
+	.GAD_POP_RSP_RET = (0xffffffff804510b0 - KERNEL_TEXT),
     // .GAD_WRMSR_RET not needed
     .GAD_MOV_QWORD_PTR_RDI_RSI_POP_RBP_RET = (0xffffffff80603c0a - KERNEL_TEXT),
     // .HOOK_ACPI_WAKEUP_MACHDEP not needed
@@ -320,6 +322,7 @@ offset_list off_0510 = {
     .GAD_POP_RSI_RET = (0xffffffff803a92b0 - KERNEL_TEXT),
     .GAD_POP_RDX_RET = (0xffffffff8054d532 - KERNEL_TEXT),
     // .GAD_POP_RCX_RET not needed
+	.GAD_POP_RSP_RET = (0xffffffff804510b0 - KERNEL_TEXT),
     // .GAD_WRMSR_RET not needed
     .GAD_MOV_QWORD_PTR_RDI_RSI_POP_RBP_RET = (0xffffffff80603c0a - KERNEL_TEXT),
     // .HOOK_ACPI_WAKEUP_MACHDEP not needed
@@ -361,6 +364,7 @@ offset_list off_0550 = {
     .GAD_POP_RSI_RET = (0xffffffff803a9270 - KERNEL_TEXT),
     .GAD_POP_RDX_RET = (0xffffffff8054d4f2 - KERNEL_TEXT),
     // .GAD_POP_RCX_RET not needed
+	.GAD_POP_RSP_RET = (0xffffffff80451070 - KERNEL_TEXT),
     // .GAD_WRMSR_RET not needed
     .GAD_MOV_QWORD_PTR_RDI_RSI_POP_RBP_RET = (0xffffffff80603cba - KERNEL_TEXT),
     // .HOOK_ACPI_WAKEUP_MACHDEP not needed
