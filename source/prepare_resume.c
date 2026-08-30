@@ -22,7 +22,7 @@ int remove_xotext(void) {
 }
 
 int kernel_pmap_invalidate_all(void) {
-  static uint64_t two_zero_pages[PAGE_SIZE * 2] = {0};
+  static uint8_t two_zero_pages[PAGE_SIZE * 2] = {0};
 
   int pipe_fds[2];
 
@@ -30,7 +30,8 @@ int kernel_pmap_invalidate_all(void) {
     return -1;
   }
 
-  if (write(pipe_fds[1], two_zero_pages, PAGE_SIZE * 2) < 0) {
+  if (write(pipe_fds[1], two_zero_pages, sizeof(two_zero_pages)) !=
+      (ssize_t)sizeof(two_zero_pages)) {
     close(pipe_fds[0]);
     close(pipe_fds[1]);
     return -1;
@@ -45,9 +46,12 @@ int kernel_pmap_invalidate_all(void) {
     return -1;
   }
 
-  uint64_t read_fd_buffer;
-  kernel_copyout(read_fd_file_data + 0x10, &read_fd_buffer,
-                 sizeof(read_fd_buffer));
+  uint64_t read_fd_buffer = 0;
+  if (kernel_copyout(read_fd_file_data + 0x10, &read_fd_buffer,
+                     sizeof(read_fd_buffer))) {
+    close(pipe_fds[0]);
+    return -1;
+  }
 
   if (!INKERNEL(read_fd_buffer)) {
     close(pipe_fds[0]);

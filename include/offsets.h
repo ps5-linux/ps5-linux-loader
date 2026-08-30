@@ -52,6 +52,7 @@ typedef struct _offset_list {
   uint64_t PS5_WIFI_FW_SIZE;
 } offset_list;
 
+extern offset_list off_0250;
 extern offset_list off_0300;
 extern offset_list off_0310;
 extern offset_list off_0320;

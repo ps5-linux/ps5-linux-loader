@@ -2,6 +2,9 @@ bin/
 shellcode_0607/shellcode_0607.h
 shellcode_kernel/shellcode_kernel.h
 shellcode_hv/shellcode_hv.h
+shellcode_kernel_0250/shellcode_kernel_0250.h
+shellcode_hv_0250/shellcode_hv_0250.h
 *.elf
 *.bin
 *.o
+*.d
