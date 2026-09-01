@@ -1,6 +1,6 @@
 # ps5-linux
 
-**ps5-linux** leverages patched HV vulnerabilities to transform your **PS5 Phat and Slim** console running **3.00-7.61 firmwares** into a highly capable Linux PC, unlocking its full hardware potential for desktop use. Powered by 8 CPU cores (16 threads) at **3.5 GHz** and a GPU at **2.23 GHz**, it provides enough performance to run Steam games and various emulators with impressive fluidity.
+**ps5-linux** leverages patched HV vulnerabilities to transform your **PS5 Phat and Slim** console running **2.50-7.61 firmwares** into a highly capable Linux PC, unlocking its full hardware potential for desktop use. Powered by 8 CPU cores (16 threads) at **3.5 GHz** and a GPU at **2.23 GHz**, it provides enough performance to run Steam games and various emulators with impressive fluidity.
 
 Features:
 
@@ -17,13 +17,14 @@ Features:
 
 *ps5-linux* is only supported on PS5 Phat and Slim on the following firmwares:
 
+- **2.50** with USB boot support
 - **3.00**, **3.10**, **3.20**, **3.21** without M.2 support
 - **4.00**, **4.02**, **4.03**, **4.50**, **4.51** with M.2 support
 - **5.00**, **5.02**, **5.10**, **5.50** with M.2 support
 - **6.00**, **6.02**, **6.50** with M.2 support
 - **7.00**, **7.01**, **7.20**, **7.40**, **7.60**, **7.61** with M.2 support
 
-Support for 1.xx and 2.xx firmwares may be added in the future, but we will not prioritize this effort.
+Support for 1.xx firmwares may be added in the future, but we will not prioritize this effort.
 
 If you are on firmwares in-between or you want to update to a specific firmware, [download the correct PUP](https://darthsternie.net/ps5-firmwares/) and follow the [official guide](https://www.playstation.com/en-us/support/hardware/reinstall-playstation-system-software-safe-mode) to upgrade your PS5. **Obviously you cannot downgrade.**
 
@@ -113,6 +114,10 @@ The front top Type-A port is USB 2.0 which is slower and thus not recommended.
 
 ### 4. Run the jailbreak
 
+#### Firmware 2.50
+
+Run a firmware 2.50-compatible UMTX jailbreak and start its ELF loader. Firmware 2.50 uses a synchronous hypervisor handoff and does not require a rest-mode cycle.
+
 #### Firmware 3.00-5.50
 
 1. Clone via: `git clone https://github.com/idlesauce/umtx2`
@@ -148,7 +153,7 @@ Send the payload with your `$PS5IP` (shown on the page):
 socat -t 99999999 - TCP:$PS5IP:9021 < ps5-linux-loader.elf
 ```
 
-If all is successful, the payload will automatically go into rest mode. Wait until the orange LED stops blinking and becomes static. Only then, press the power button again to boot your PS5 into Linux. If the boot is successful, **the LED should turn white**. If it boots back into PS5 OS, then it's because you pressed the power button too early. Or, you did not enable rest mode features as described above. If it freezes instead of going into rest mode, then it is likely because you have etahen/kstuff enabled, which is incompatible. Disable them.
+On firmware 2.50, the payload hands off to Linux immediately. On later supported firmwares, the payload automatically enters rest mode. Wait until the orange LED stops blinking and becomes static, then press the power button again to boot Linux. If it boots back into PS5 OS, the power button was pressed too early or rest-mode USB power was not enabled. If it freezes before rest mode, disable etahen/kstuff.
 
 If the LED is white, but you still have a blackscreen then:
 

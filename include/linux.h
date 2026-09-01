@@ -1,8 +1,12 @@
 #ifndef __LINUX_H__
 #define __LINUX_H__
 
+#include <stddef.h>
 #include <stdint.h>
+
+#if __STDC_HOSTED__
 #include <unistd.h>
+#endif
 
 #define X86_SUBARCH_PS5 5
 

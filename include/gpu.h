@@ -10,6 +10,7 @@
 #define GPU_PDE_TF_BIT 56
 #define GPU_PDE_BLOCK_FRAG_BIT 59
 #define GPU_PDE_ADDR_MASK 0x0000FFFFFFFFFFC0ULL
+#define GPU_PHYS_ADDR_LIMIT (1ULL << 48)
 
 #define PROT_GPU_READ 0x10
 #define PROT_GPU_WRITE 0x20
@@ -41,13 +42,16 @@ struct gpu_ctx {
   uint64_t cmd_va;      // CPU VA of PM4 command buffer
 
   uint64_t victim_real_pa; // original physical address of victim buffer
+  uint64_t transfer_real_pa;
   uint64_t victim_ptbe_va; // kernel VA of the GPU PTE for victim buffer
   uint64_t cleared_ptbe;   // GPU PTE with physical address cleared (template)
+  uint64_t original_rw_ptbe;
+  uint64_t leaf_pa_mask;
   uint64_t page_size; // GPU page size for victim allocation (should be 2MB)
   uint64_t dmem_size; // allocation size (2MB)
 };
 
-void gpu_set_offsets(struct gpu_kernel_offsets *offsets);
+void gpu_set_offsets(const struct gpu_kernel_offsets *offsets);
 
 int gpu_init(void);
 int gpu_init_internal(void);
@@ -64,6 +68,7 @@ void gpu_write_phys4(uint64_t phys_addr, uint32_t value);
 void gpu_write_phys8(uint64_t phys_addr, uint64_t value);
 
 void gpu_cleanup(void);
+int gpu_cleanup_checked(void);
 
 struct gpu_ctx *gpu_get_ctx(void);
 

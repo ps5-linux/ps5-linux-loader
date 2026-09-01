@@ -17,8 +17,7 @@ uint32_t fw;
 struct linux_info linux_i;
 
 int setup_env(void) {
-  notify("Welcome to ps5-linux-loader. We'll defeat HV and prepare the system "
-         "to boot Linux on sleep resume.\n");
+  notify("Welcome to ps5-linux-loader.\n");
   if (set_offsets())
     return -1;
   if (init_global_vars())
@@ -31,6 +30,9 @@ int set_offsets(void) {
   if (fw == 0)
     return -1;
   switch (fw) {
+  case 0x0250:
+    env_offset = off_0250;
+    break;
   case 0x0300:
     env_offset = off_0300;
     break;
@@ -216,17 +218,21 @@ uint64_t page_remove_global(uint64_t va) {
     int shift = 39 - (level * 9);
     uint64_t idx = (va >> shift) & 0x1FF;
     uint64_t entry_va = dmap + PAGE_PA(table_phys) + idx * 8;
-    uint64_t entry;
+    uint64_t entry = 0;
 
-    // Read Level X entry
-    kread(entry_va, &entry, sizeof(entry));
+    if (kernel_copyout(entry_va, &entry, sizeof(entry)))
+      return 0;
 
     if (!PAGE_P(entry))
       return 0;
 
     if ((level == 1 || level == 2) && PAGE_PS(entry)) {
       PAGE_CLEAR_G(entry);
-      kwrite(entry_va, &entry, sizeof(entry));
+      uint64_t readback = 0;
+      if (kernel_copyin(&entry, entry_va, sizeof(entry)) ||
+          kernel_copyout(entry_va, &readback, sizeof(readback)) ||
+          readback != entry)
+        return 0;
 
       uint64_t page_size = P_SIZE(level);
       return PAGE_PA(entry) | (va & (page_size - 1));
@@ -234,7 +240,11 @@ uint64_t page_remove_global(uint64_t va) {
 
     if (level == 3) {
       PAGE_CLEAR_G(entry);
-      kwrite(entry_va, &entry, sizeof(entry));
+      uint64_t readback = 0;
+      if (kernel_copyin(&entry, entry_va, sizeof(entry)) ||
+          kernel_copyout(entry_va, &readback, sizeof(readback)) ||
+          readback != entry)
+        return 0;
 
       return PAGE_PA(entry) | (va & 0xFFF);
     }
