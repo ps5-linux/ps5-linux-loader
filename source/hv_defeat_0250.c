@@ -99,8 +99,7 @@ static int stage0_discover(struct hv_defeat_ctx *ctx) {
   uint64_t kernel_cr3 = kr8_0250(kernel_pmap + FW_0250_PMAP_PM_CR3);
   if (!INKERNEL(ctx->dmap_base) || !INKERNEL(kernel_pml4) || !kernel_cr3 ||
       (kernel_cr3 & 0xFFF) || kernel_cr3 >= 0x1000000000ULL ||
-      kernel_pml4 != ctx->dmap_base + kernel_cr3 || ctx->dmap_base != dmap ||
-      kernel_cr3 != cr3) {
+      kernel_pml4 != ctx->dmap_base + kernel_cr3 || ctx->dmap_base != dmap) {
     printf("  invalid DMAP relation pml4=0x%lx cr3=0x%lx\n", kernel_pml4,
            kernel_cr3);
     return -1;
