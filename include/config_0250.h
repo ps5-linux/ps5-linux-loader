@@ -34,8 +34,8 @@
 
 #define VRAM_SIZE (512ULL * 1024 * 1024)
 #define CMD_LINE                                                               \
-  "root=/dev/sda2 rw rootwait console=ttyTitania0 console=tty0 "               \
-  "video=DP-1:1920x1080@60 mitigations=off idle=halt pci=pcie_bus_perf "       \
+  "root=/dev/sda2 rw rootwait console=tty0 console=ttyTitania0 "               \
+  "mitigations=off idle=halt pci=pcie_bus_perf "                               \
   "iommu=pt module_blacklist=ccp modprobe.blacklist=ccp"
 
 #endif
