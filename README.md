@@ -10,6 +10,7 @@ Features:
 - BD drive usable via custom ahci driver
 - Internal Bluetooth usable via custom xhci driver
 - Ethernet port usable via custom gbe driver
+- Hardware video decode, encode and transcode (VCN) via VAAPI
 
 ![Alt Text](logo.webp)
 
@@ -272,6 +273,8 @@ For any future ps5-linux updates, you can download the `.deb` or `.pkg.tar.zst` 
   - A: Yes, the internal SSD is not modified
 - Q: Can I use the PS5's NIC/WLAN module in Linux?
   - A: WLAN is only supported for Marvell chipsets at the moment. Ethernet is supported on all models.
+- Q: Does hardware video decode and transcode work?
+  - A: Yes, since [ps5-linux-patches #38](https://github.com/ps5-linux/ps5-linux-patches/pull/38). Decode works for H.264, HEVC Main/Main 10, VP9 Profile 0/2, VC-1 and MPEG-2. Encode works for H.264, and for HEVC with I-frames only.
 - Q: Does the DualSense controller work?
   - A: Yes, via internal Bluetooth as well as Bluetooth dongle.
 - Q: What resolutions and refresh rates are supported?
@@ -296,6 +299,7 @@ Many configurations, tips and tricks from the [AMD BC250 Documentation](https://
 - screen save does not work properly
 - hdmi audio output does not work on some monitors
 - hdmi 1440p and 2160p video output does not work on some monitors
+- VCN HEVC encode has corrupt chroma with P-frames, use I-frame only (`-g 1 -bf 0`) or H.264
 
 ## Upstreamed changes
 
