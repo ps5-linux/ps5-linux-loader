@@ -2,6 +2,7 @@
 #include "../shellcode_kernel/shellcode_kernel.h"
 #include "../shellcode_kernel/shellcode_kernel_args.h"
 #include "config.h"
+#include "hv_defeat_13xx.h"
 #include "iommu.h"
 #include "offsets.h"
 #include "shellcode_1360.h"
@@ -106,7 +107,7 @@ int prepare_resume(void **shellcode_kernel, size_t *shellcode_kernel_len) {
   if (fw == 0x1300 || fw == 0x1320) {
     shellcode_src = shellcode_kernel_13xx_bin;
     shellcode_len = shellcode_kernel_13xx_bin_len;
-  } else if (fw == 0x1360) {
+  } else if (fw == 0x1360 && linux_i.kit_type != KIT_RETAIL_PRO) {
     shellcode_src = stock_shellcode_kernel_1360;
     shellcode_len = stock_shellcode_kernel_1360_len;
   }
@@ -121,7 +122,7 @@ int prepare_resume(void **shellcode_kernel, size_t *shellcode_kernel_len) {
     return -1;
   *shellcode_kernel_len = shellcode_len;
   memcpy(*shellcode_kernel, shellcode_src, shellcode_len);
-  if (fw == 0x1360 &&
+  if (fw == 0x1360 && linux_i.kit_type != KIT_RETAIL_PRO &&
       apply_1360_dma_e820_map(*shellcode_kernel, shellcode_len)) {
     notify("13.60 DMA E820 patch did not match stock shellcode\n");
     return -1;
@@ -196,6 +197,12 @@ uint64_t prepare_sck_args(void) {
   args.kernel_cfi_check = ktext + env_offset.KERNEL_CFI_CHECK;
   args.hv_handle_vmexit_pa = env_offset.HV_HANDLE_VMEXIT_PA;
   args.hv_code_cave_pa = env_offset.HV_CODE_CAVE_PA;
+  if (fw == 0x1360 && linux_i.kit_type == KIT_RETAIL_PRO) {
+    uint64_t pro_base = derive_h() + HV_CODE_OFFSET_PRO;
+    uint64_t hv_offset = pro_base - HV_BASE_REGULAR;
+    args.hv_handle_vmexit_pa += hv_offset;
+    args.hv_code_cave_pa += hv_offset;
+  }
 
   args.linux_info_va = linux_i.linux_info;
 

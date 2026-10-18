@@ -141,7 +141,7 @@ uint64_t getpmap(uint64_t proc) {
 uint64_t vtophys_user(uint64_t va) {
   uintptr_t self_pmap = getpmap(kernel_get_proc(getpid()));
   uintptr_t self_pml4 = get_pml4(self_pmap);
-  uint64_t pa = vtophys_custom(va, self_pml4 & 0xFFFFFFFF);
+  uint64_t pa = vtophys_custom(va, self_pml4 - dmap);
   return pa;
 }
 
@@ -150,7 +150,7 @@ uint64_t vtophys(uint64_t va) { return vtophys_custom(va, cr3); }
 
 // Source: PS5_kldload
 uint64_t vtophys_custom(uint64_t va, uint64_t cr3_custom) {
-  uint64_t table_phys = cr3_custom & 0xFFFFFFFF;
+  uint64_t table_phys = cr3_custom;
 
   for (int level = 0; level < 4; level++) {
     int shift = 39 - (level * 9);
@@ -319,6 +319,10 @@ bool sceKernelIsDevKit(void) {
 }
 
 enum kit_type get_kit_type(void) {
+  if (sceKernelGetMainSocId() == 0x840fd0) {
+    notify("PS5 Pro detected\n");
+    return KIT_RETAIL_PRO;
+  }
   if (sceKernelIsDevKit()) {
     notify("DevKit detected\n");
     return KIT_DEVKIT;

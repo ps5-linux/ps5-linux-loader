@@ -8,6 +8,7 @@
 #include <string.h>
 
 int sceKernelGetCurrentCpu();
+int sceKernelGetMainSocId();
 int sceKernelSendNotificationRequest(int, void *, size_t, int);
 int sceKernelOpenEventFlag(void *, const char *);
 int sceKernelNotifySystemSuspendStart(void);
@@ -162,7 +163,7 @@ bool if_exists(const char *path);
 bool sceKernelIsTestKit(void);
 bool sceKernelIsDevKit(void);
 
-enum kit_type { KIT_RETAIL, KIT_TESTKIT, KIT_DEVKIT };
+enum kit_type { KIT_RETAIL, KIT_TESTKIT, KIT_DEVKIT, KIT_RETAIL_PRO };
 
 enum kit_type get_kit_type(void);
 

@@ -1,6 +1,6 @@
 # ps5-linux
 
-**ps5-linux** leverages patched HV vulnerabilities to transform your **PS5 Phat and Slim** console running **3.00-13.60 firmwares** into a highly capable Linux PC, unlocking its full hardware potential for desktop use. Powered by 8 CPU cores (16 threads) at **3.5 GHz** and a GPU at **2.23 GHz**, it provides enough performance to run Steam games and various emulators with impressive fluidity.
+**ps5-linux** leverages patched HV vulnerabilities to transform your **PS5 Phat, Slim and Pro** console running **3.00-13.60 firmwares** into a highly capable Linux PC, unlocking its full hardware potential for desktop use. Powered by 8 CPU cores (16 threads) at **3.5 GHz** and a GPU at **2.23 GHz**, it provides enough performance to run Steam games and various emulators with impressive fluidity.
 
 Features:
 
@@ -16,14 +16,18 @@ Features:
 
 ## PS5 firmware
 
-*ps5-linux* is only supported on PS5 Phat and Slim on the following firmwares:
+*ps5-linux* is supported on the following firmwares:
 
+**PS5 Phat and Slim:**
 - **3.00**, **3.10**, **3.20**, **3.21** without M.2 support
 - **4.00**, **4.02**, **4.03**, **4.50**, **4.51** with M.2 support
 - **5.00**, **5.02**, **5.10**, **5.50** with M.2 support
 - **6.00**, **6.02**, **6.50** with M.2 support
 - **7.00**, **7.01**, **7.20**, **7.40**, **7.60**, **7.61** with M.2 support
 - **13.00**, **13.20**, **13.60** with M.2 support
+
+**PS5 Pro:**
+- **13.60**
 
 Support for 1.xx and 2.xx firmwares may be added in the future, but we will not prioritize this effort.
 
@@ -273,7 +277,7 @@ For any future ps5-linux updates, you can download the `.deb` or `.pkg.tar.zst` 
 - Q: Can I continue using my PS5 if I install Linux?
   - A: Yes, the internal SSD is not modified
 - Q: Can I use the PS5's NIC/WLAN module in Linux?
-  - A: WLAN is only supported for Marvell chipsets at the moment. Ethernet is supported on all models.
+  - A: WLAN is supported for Marvell chipsets (Phat/Slim) and the MediaTek MT7925 (Pro) — both work out of the box with the included firmware. Ethernet is supported on all models.
 - Q: Does hardware video decode and transcode work?
   - A: Yes, since [ps5-linux-patches #38](https://github.com/ps5-linux/ps5-linux-patches/pull/38). Decode works for H.264, HEVC Main/Main 10, VP9 Profile 0/2, VC-1 and MPEG-2. Encode works for H.264, and for HEVC with I-frames only.
 - Q: Does the DualSense controller work?

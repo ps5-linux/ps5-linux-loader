@@ -33,6 +33,11 @@
   "root=/dev/sda2 rw rootwait console=ttyTitania0 console=tty0 "               \
   "video=DP-1:1920x1080@60 mitigations=off idle=halt pci=pcie_bus_perf"
 
+// HV layout: derive_h() returns the region base at runtime. On regular the
+// HV binary starts at the region base; on Pro it sits 8MB in.
+#define HV_BASE_REGULAR 0x062800000ULL
+#define HV_CODE_OFFSET_PRO 0x800000ULL
+
 #define DEBUG 0 // Toggle to 0 to disable logs
 
 #endif

@@ -144,23 +144,41 @@ static void install_hv_code(void) {
     *(uint64_t *)PHYS_TO_DMAP(l40_l3_addr + i * 8) = identity_pml40_l3[i];
   }
 
+  // Keep the HV trampoline mapped after switching CR3.
+  uint64_t cave_index = args.hv_code_cave_pa >> 30;
+  if (cave_index >= l3_size) {
+    *(uint64_t *)PHYS_TO_DMAP(l40_l3_addr + cave_index * 8) =
+        (cave_index << 30) | 0x83;
+  }
+
   // Install shellcode_hv
   memcpy((void *)PHYS_TO_DMAP(cave_hv_code), shellcode_hv_bin,
          shellcode_hv_bin_len);
 }
 
 void patch_hv(void) {
-  // Jump to shellcode final identity mapping
-  uint8_t shellcode_jmp[] = {0x48, 0xC7, 0xC0, 0xAA,
-                             0xAA, 0xAA, 0xAA, // mov rax, 0xAAAAAAAA
-                             0xFF, 0xE0};      // jmp rax
+  if (args.hv_code_cave_pa > 0x7fffffffULL) {
+    // Pro HV code cave is above 4GB, needs 64-bit movabs.
+    uint8_t shellcode_jmp[] = {0x48, 0xB8, 0xAA, 0xAA, 0xAA,
+                               0xAA, 0xAA, 0xAA, 0xAA, 0xAA, // movabs rax, imm64
+                               0xFF, 0xE0};                    // jmp rax
 
-  // Update code cave in hv 1:1 region
-  *(uint32_t *)(&shellcode_jmp[3]) = (uint32_t)args.hv_code_cave_pa;
+    *(uint64_t *)(&shellcode_jmp[2]) = args.hv_code_cave_pa;
+    memcpy((void *)PHYS_TO_DMAP(args.hv_handle_vmexit_pa), shellcode_jmp,
+           sizeof(shellcode_jmp));
+  } else {
+    // Jump to shellcode final identity mapping
+    uint8_t shellcode_jmp[] = {0x48, 0xC7, 0xC0, 0xAA,
+                               0xAA, 0xAA, 0xAA, // mov rax, 0xAAAAAAAA
+                               0xFF, 0xE0};      // jmp rax
 
-  // Just patch the VMEXIT handler directly, avoiding all checks
-  memcpy((void *)PHYS_TO_DMAP(args.hv_handle_vmexit_pa), shellcode_jmp,
-         sizeof(shellcode_jmp));
+    // Update code cave in hv 1:1 region
+    *(uint32_t *)(&shellcode_jmp[3]) = (uint32_t)args.hv_code_cave_pa;
+
+    // Just patch the VMEXIT handler directly, avoiding all checks
+    memcpy((void *)PHYS_TO_DMAP(args.hv_handle_vmexit_pa), shellcode_jmp,
+           sizeof(shellcode_jmp));
+  }
 
   uint8_t shellcode_identity_and_jmp[] = {
       0x48, 0xB8, 0xAA, 0xAA, 0xAA,

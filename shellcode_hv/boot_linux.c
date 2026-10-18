@@ -59,12 +59,21 @@ static void e820_memory_setup(struct boot_params *bp) {
   append_e820_table(bp, 0x0000c0000, 0x000100000, E820_TYPE_RESERVED); // VBIOS
   append_e820_table(bp, 0x000100000, 0x03fffc000, E820_TYPE_RAM);
   append_e820_table(bp, 0x03fffc000, 0x040000000, E820_TYPE_RESERVED);
-  append_e820_table(bp, 0x040000000, 0x060000000, E820_TYPE_RAM);
-  append_e820_table(bp, 0x060000000, 0x060800000, E820_TYPE_RESERVED); // MP4
+  if (info.kit_type == KIT_RETAIL_PRO) {
+    append_e820_table(bp, 0x040000000, 0x060800000, E820_TYPE_RAM);
+  } else {
+    append_e820_table(bp, 0x040000000, 0x060000000, E820_TYPE_RAM);
+    append_e820_table(bp, 0x060000000, 0x060800000, E820_TYPE_RESERVED); // MP4
+  }
   append_e820_table(bp, 0x060800000, 0x060c00000, E820_TYPE_RESERVED); // VCN FW
-  append_e820_table(bp, 0x060c00000, 0x062800000, E820_TYPE_RAM);
-  append_e820_table(bp, 0x062800000, 0x064800000, E820_TYPE_RESERVED); // HV
-  append_e820_table(bp, 0x064800000, 0x064829000, E820_TYPE_RESERVED); // MP3
+  if (info.kit_type == KIT_RETAIL_PRO) {
+    append_e820_table(bp, 0x060c00000, 0x064000000, E820_TYPE_RAM);
+    append_e820_table(bp, 0x064000000, 0x064829000, E820_TYPE_RESERVED); // MP3
+  } else {
+    append_e820_table(bp, 0x060c00000, 0x062800000, E820_TYPE_RAM);
+    append_e820_table(bp, 0x062800000, 0x064800000, E820_TYPE_RESERVED); // HV
+    append_e820_table(bp, 0x064800000, 0x064829000, E820_TYPE_RESERVED); // MP3
+  }
   append_e820_table(bp, 0x064829000, 0x07f9d0000, E820_TYPE_RAM);
   append_e820_table(bp, 0x07f9d0000, 0x07fd5f000, E820_TYPE_RESERVED);
   append_e820_table(bp, 0x07fd5f000, 0x07fd63000, E820_TYPE_RESERVED);
@@ -79,8 +88,15 @@ static void e820_memory_setup(struct boot_params *bp) {
   append_e820_table(bp, 0x100000000, VRAM_BASE, E820_TYPE_RAM);
   append_e820_table(bp, VRAM_BASE, 0x470000000, E820_TYPE_RESERVED); // VRAM
 
+  if (info.kit_type == KIT_RETAIL_PRO) {
+    append_e820_table(bp, 0x470000000, 0x47f300000, E820_TYPE_RAM);
+    append_e820_table(bp, 0x47f300000, 0x880000000, E820_TYPE_RESERVED);
+    append_e820_table(bp, 0x880000000, 0x8e0000000, E820_TYPE_RAM);
+    append_e820_table(bp, 0x8e0000000, 0x8e2000000, E820_TYPE_RESERVED); // HV
+    append_e820_table(bp, 0x8e2000000, 0x900000000, E820_TYPE_RAM);
+  }
   // DevKits have 32GB
-  if (info.kit_type != KIT_DEVKIT) {
+  else if (info.kit_type != KIT_DEVKIT) {
     append_e820_table(bp, 0x470000000, 0x47f300000, E820_TYPE_RAM);
     append_e820_table(bp, 0x47f300000, 0x480000000, E820_TYPE_RESERVED);
   } else {
@@ -116,7 +132,9 @@ void boot_linux(void) {
   shdr->ramdisk_size = info.initrd_size & 0xffffffff;
   bp->ext_ramdisk_image = info.initrd >> 32;
   bp->ext_ramdisk_size = info.initrd_size >> 32;
-  bp->acpi_rsdp_addr = ACPI_RSDP_ADDRESS;
+  bp->acpi_rsdp_addr = info.kit_type == KIT_RETAIL_PRO
+                             ? ACPI_RSDP_ADDRESS_PRO
+                             : ACPI_RSDP_ADDRESS;
 
   strcpy((char *)cmdline_pa, info.cmdline);
 

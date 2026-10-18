@@ -16,6 +16,8 @@
 
 #define ACPI_RSDP_ADDRESS 0x7fd8e014
 
+#define ACPI_RSDP_ADDRESS_PRO 0x7fd8e000
+
 #define AMDGPU_MMIO_BASE 0xe0600000
 
 #define RCC_CONFIG_MEMSIZE 0x378c
@@ -45,4 +47,4 @@
 void entry(void);
 void boot_linux(void);
 
-enum kit_type { KIT_RETAIL, KIT_TESTKIT, KIT_DEVKIT };
+enum kit_type { KIT_RETAIL, KIT_TESTKIT, KIT_DEVKIT, KIT_RETAIL_PRO };
