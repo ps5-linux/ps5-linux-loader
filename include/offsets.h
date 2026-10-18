@@ -50,7 +50,32 @@ typedef struct _offset_list {
   /* Wifi FW */
   uint64_t PS5_WIFI_FW_OFFSET;
   uint64_t PS5_WIFI_FW_SIZE;
+
+  uint64_t HV_MP_STARTUP_CALL;
+  uint64_t MP_STARTUP_INIT_VECTOR;
+  uint64_t DATA_CAVE;
+  uint64_t GAD_PIVOT_ADD_RSP28_RET;
+  uint64_t GAD_POP_R8_RET;
+  uint64_t GAD_STORE_RCX_R8_RET;
+  uint64_t GAD_STORE_RDI8_RCX_RET;
+  uint64_t GAD_OR_RCX_EAX_RET;
+  uint64_t GAD_SET_DR7_RET;
+  uint64_t GAD_STORE_RCX_RDX_RET;
+  uint64_t GAD_STORE_RCX_RAX_RET;
+  uint64_t GAD_MOV_RAX_RSI_RET;
+  uint64_t GAD_MOV_RAX_RDI_RET;
+  uint64_t GAD_REP_MOVSB_RET;
+  uint64_t GAD_CLD_RET;
+  uint64_t GAD_RET_TRAMP;
+  uint64_t GAD_DBREG_RESUME;
+  uint64_t RESERVED_56;
+  uint64_t RESERVED_57;
+  uint64_t NVS_SIGNATURE;
+  uint64_t HV_EFI_MAP_ROOT;
 } offset_list;
+
+_Static_assert(sizeof(offset_list) == 0x1E0,
+               "offset_list must match the 13.60 60-qword table");
 
 extern offset_list off_0300;
 extern offset_list off_0310;
@@ -74,5 +99,6 @@ extern offset_list off_0720;
 extern offset_list off_0740;
 extern offset_list off_0760;
 extern offset_list off_0761;
+extern offset_list off_1360;
 
 #endif

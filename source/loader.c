@@ -69,7 +69,8 @@ long find_and_get_size_of_file(const char *filename, char *found_path) {
     snprintf(full_path, sizeof(full_path), "%s%s", file_paths[i], filename);
 
     if (stat(full_path, &st) == 0) {
-      notify("File '%s' found in '%s'\n", filename, file_paths[i]);
+      notify("File '%s' found in '%s' - rmux was here\n", filename,
+             file_paths[i]);
       strcpy(found_path, full_path);
       return st.st_size;
     }
