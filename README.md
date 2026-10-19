@@ -1,6 +1,6 @@
 # ps5-linux
 
-**ps5-linux** leverages patched HV vulnerabilities to transform your **PS5 Phat and Slim** console running **3.00-7.61 firmwares** into a highly capable Linux PC, unlocking its full hardware potential for desktop use. Powered by 8 CPU cores (16 threads) at **3.5 GHz** and a GPU at **2.23 GHz**, it provides enough performance to run Steam games and various emulators with impressive fluidity.
+**ps5-linux** leverages patched HV vulnerabilities to transform your **PS5 Phat and Slim** console running **3.00-13.60 firmwares** into a highly capable Linux PC, unlocking its full hardware potential for desktop use. Powered by 8 CPU cores (16 threads) at **3.5 GHz** and a GPU at **2.23 GHz**, it provides enough performance to run Steam games and various emulators with impressive fluidity.
 
 Features:
 
@@ -23,6 +23,7 @@ Features:
 - **5.00**, **5.02**, **5.10**, **5.50** with M.2 support
 - **6.00**, **6.02**, **6.50** with M.2 support
 - **7.00**, **7.01**, **7.20**, **7.40**, **7.60**, **7.61** with M.2 support
+- **13.00**, **13.20**, **13.60** with M.2 support
 
 Support for 1.xx and 2.xx firmwares may be added in the future, but we will not prioritize this effort.
 
@@ -261,7 +262,7 @@ For any future ps5-linux updates, you can download the `.deb` or `.pkg.tar.zst` 
 
 ## FAQ
 
-- Q: Will higher >=8.00 firmwares be supported?
+- Q: Will higher >=14.00 firmwares be supported?
   - A: No.
 - Q: Why can I not use M.2 on 3.xx?
   - A: Because the PS5 fails to boot with it attached.
