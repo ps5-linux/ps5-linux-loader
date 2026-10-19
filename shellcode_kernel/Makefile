@@ -7,7 +7,9 @@ CC      = gcc
 LD      = ld
 OBJCOPY = objcopy
 endif
-CFLAGS  = -O2 -fno-stack-protector -ffreestanding -nostdlib -fcf-protection=none -mno-sse -mno-sse2 -m64
+# EXTRA_CFLAGS carries per-build defines, e.g. the op-count bisect lever:
+#   make -C shellcode_kernel EXTRA_CFLAGS=-DPS5_OP_LIMIT=16
+CFLAGS  = -O2 -fno-stack-protector -ffreestanding -nostdlib -fcf-protection=none -mno-sse -mno-sse2 -m64 $(EXTRA_CFLAGS)
 LDFLAGS = -T linker.ld
 TARGET  = shellcode_kernel.elf
 TEXT_BIN = shellcode_kernel.bin

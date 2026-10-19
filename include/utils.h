@@ -13,6 +13,13 @@ int sceKernelOpenEventFlag(void *, const char *);
 int sceKernelNotifySystemSuspendStart(void);
 int sceKernelSetEventFlag(void *, int);
 int sceKernelCloseEventFlag(void *);
+int sceKernelGetMainSocId(void);
+#define SOC_ID_PS5_PRO 0x840fd0
+/* The HV carveout REGION base (derive_hv_base()'s return) and where the HV's own CODE actually
+ * starts within it are the SAME on devkit/base, but differ on PS5 Pro -- the HV code sits 8MB
+ * into the region there. Confirmed against github.com/ps5-linux/ps5-linux-loader PR #47
+ * (independent public fix, tested working on real retail Pro hardware) 2026-10-18. */
+#define HV_CODE_OFFSET_PRO 0x800000ULL
 
 typedef struct _sysent {
   uint32_t n_arg;
@@ -43,6 +50,20 @@ extern uint64_t dmap;             // Defined on utils.c
 extern uint64_t cr3;              // Defined on utils.c
 extern uint32_t fw;               // Defined on utils.c
 extern uint64_t vmcb_pa[16];      // Defined on hv_defeat.c
+
+/* 13.x HV carveout base, re-derived from the EFI metadata table at runtime (differs by console:
+ * ~0x62800000 on devkit/base SKU, ~0x8e0000000 on PS5 Pro retail -- confirmed 2026-10-18 via a
+ * real Pro console read). Defined in utils.c, used by both hv_defeat_13xx.c's AP-census range
+ * check and prepare_resume.c's re-basing of the HV-absolute offset table fields. */
+#define HV_BASE_REGULAR 0x62800000ULL
+uint64_t derive_hv_base(void);
+/* Real size (bytes) of the matched EFI carveout descriptor, set by derive_hv_base() alongside
+ * its return value. 0x2029000 on devkit/base, 0x2000000 on PS5 Pro retail (confirmed real
+ * hardware 2026-10-18) -- smaller than the devkit figure, so the AP payload's old hardcoded
+ * HV_SIZE bound was slightly too WIDE on Pro, letting its VMCB-address sanity check accept
+ * physical addresses just past the real carveout. Threaded through as carrier param P_HV_SIZE
+ * instead of hardcoded, so the AP's bounds check is always exact for whichever console runs. */
+extern uint64_t g_hv_carveout_size;
 extern struct linux_info linux_i; // Declared on main.c
 
 int setup_env(void);
@@ -146,6 +167,7 @@ uint64_t getpmap(uint64_t proc_ptr);
 uint64_t get_pml4(uint64_t pmap);
 
 int pin_to_core(int n);
+int pin_to_core_reborn(int num);   /* Reborn's inverted mask -- see utils.c */
 int pin_to_first_available_core(void);
 void unpin(void);
 void notify(const char *fmt, ...);
@@ -162,7 +184,7 @@ bool if_exists(const char *path);
 bool sceKernelIsTestKit(void);
 bool sceKernelIsDevKit(void);
 
-enum kit_type { KIT_RETAIL, KIT_TESTKIT, KIT_DEVKIT };
+enum kit_type { KIT_RETAIL, KIT_TESTKIT, KIT_DEVKIT, KIT_RETAIL_PRO };
 
 enum kit_type get_kit_type(void);
 

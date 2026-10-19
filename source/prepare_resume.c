@@ -4,40 +4,10 @@
 #include "config.h"
 #include "iommu.h"
 #include "offsets.h"
-#include "shellcode_1360.h"
 #include "utils.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/mman.h>
-
-static int apply_1360_dma_e820_map(void *buffer, size_t length) {
-  static const struct {
-    size_t offset;
-    uint32_t expected;
-    uint32_t replacement;
-  } patches[] = {
-      {0x1889, 0x3FEFC000, 0x00F00000},
-      {0x18AC, 0x3FFFC000, 0x01000000},
-      {0x18B7, 0x00004000, 0x3F000000},
-  };
-  uint8_t *code = buffer;
-
-  for (size_t i = 0; i < sizeof(patches) / sizeof(patches[0]); i++) {
-    uint32_t value;
-    if (patches[i].offset > length ||
-        length - patches[i].offset < sizeof(value))
-      return -1;
-    memcpy(&value, code + patches[i].offset, sizeof(value));
-    if (value != patches[i].expected)
-      return -1;
-  }
-
-  for (size_t i = 0; i < sizeof(patches) / sizeof(patches[0]); i++)
-    memcpy(code + patches[i].offset, &patches[i].replacement,
-           sizeof(patches[i].replacement));
-
-  return 0;
-}
 
 int remove_xotext(void) {
   uint64_t start = ktext;
@@ -99,32 +69,19 @@ int prepare_resume(void **shellcode_kernel, size_t *shellcode_kernel_len) {
     return -1;
   }
 
-  const uint8_t *shellcode_src = shellcode_kernel_bin;
-  size_t shellcode_len = shellcode_kernel_bin_len;
-  if (fw == 0x1360) {
-    shellcode_src = stock_shellcode_kernel_1360;
-    shellcode_len = stock_shellcode_kernel_1360_len;
-  }
-
+  // Copy shellcode_kernel.
   *shellcode_kernel =
-      mmap(NULL, ALIGN_UP(shellcode_len, PAGE_SIZE),
+      mmap(NULL, ALIGN_UP(shellcode_kernel_bin_len, PAGE_SIZE),
            PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  if (*shellcode_kernel == MAP_FAILED)
-    return -1;
-  *shellcode_kernel_len = shellcode_len;
-  memcpy(*shellcode_kernel, shellcode_src, shellcode_len);
-  if (fw == 0x1360 &&
-      apply_1360_dma_e820_map(*shellcode_kernel, shellcode_len)) {
-    notify("13.60 DMA E820 patch did not match stock shellcode\n");
-    return -1;
-  }
+  *shellcode_kernel_len = shellcode_kernel_bin_len;
+  memcpy(*shellcode_kernel, shellcode_kernel_bin, shellcode_kernel_bin_len);
 
   uint64_t args_va = prepare_sck_args();
   if (update_sck_args_ptr((uint64_t)*shellcode_kernel, args_va))
     return -1;
 
   // Install shellcode_kernel in kernel space.
-  for (size_t i = 0; i < shellcode_len; i += PAGE_SIZE) {
+  for (int i = 0; i < shellcode_kernel_bin_len; i += PAGE_SIZE) {
     install_page_syscore(kernel_cave_shellcode + i,
                          vtophys_user((uintptr_t)*shellcode_kernel + i), 0);
   }
@@ -175,16 +132,46 @@ uint64_t prepare_sck_args(void) {
       ktext + env_offset.FUN_SMP_NO_RENDEVOUS_BARRIER;
   args.g_vbios = ktext + env_offset.G_VBIOS;
 
-  args.fun_transmitter_control = ktext + env_offset.FUN_TRANSMITTER_CONTROL;
-  args.fun_mp3_initialize = ktext + env_offset.FUN_MP3_INITIALIZE;
-  args.fun_mp3_invoke = ktext + env_offset.FUN_MP3_INVOKE;
+  /* A MISSING offset must stay NULL, not become ktext+0.
+   * off_0800/off_0900 shipped without these three, so each resolved to ktext itself
+   * and boot_linux.c called straight into the kernel ELF header. Pass 0 instead and
+   * let the call sites skip -- a reported skip beats executing a header. */
+#define VFN(f) (env_offset.f ? (ktext + env_offset.f) : 0)
+  args.fun_transmitter_control = VFN(FUN_TRANSMITTER_CONTROL);
+  args.fun_mp3_initialize = VFN(FUN_MP3_INITIALIZE);
+  args.fun_mp3_invoke = VFN(FUN_MP3_INVOKE);
+#undef VFN
 
   args.iommu_softc = ktext + env_offset.IOMMU_SOFTC;
 
   args.kernel_uart_override = ktext + env_offset.KERNEL_UART_OVERRIDE;
   args.kernel_cfi_check = ktext + env_offset.KERNEL_CFI_CHECK;
-  args.hv_handle_vmexit_pa = env_offset.HV_HANDLE_VMEXIT_PA;
-  args.hv_code_cave_pa = env_offset.HV_CODE_CAVE_PA;
+
+  /* HV_HANDLE_VMEXIT_PA / HV_CODE_CAVE_PA in the offset table are ABSOLUTE physical addresses,
+   * derived assuming the HV carveout sits at HV_BASE_REGULAR (0x62800000, true on devkit/base
+   * SKU). On PS5 Pro retail the carveout REGION is elsewhere (~0x8e0000000, confirmed
+   * 2026-10-18 on real hardware), AND the HV's own CODE starts a further 8MB into that region
+   * (HV_CODE_OFFSET_PRO) -- confirmed against the independent public fix in
+   * github.com/ps5-linux/ps5-linux-loader PR #47, tested working on real retail Pro hardware.
+   * Using the table values unmodified writes/patches into unrelated physical memory instead of
+   * the real hypervisor, which is what crashed the console on wake before this fix. Re-base
+   * both fields onto the ACTUAL HV code location for THIS console. A failed derivation (0)
+   * falls back to the raw table values -- same as before this fix existed, so firmware ranges
+   * that never had this carveout concept at all are unaffected. */
+  uint64_t hv_base_now = derive_hv_base();
+  if (hv_base_now) {
+    uint64_t hv_code_base = hv_base_now;
+    if (fw == 0x1360 && sceKernelGetMainSocId() == SOC_ID_PS5_PRO)
+      hv_code_base += HV_CODE_OFFSET_PRO;
+    args.hv_handle_vmexit_pa = hv_code_base + (env_offset.HV_HANDLE_VMEXIT_PA - HV_BASE_REGULAR);
+    args.hv_code_cave_pa = hv_code_base + (env_offset.HV_CODE_CAVE_PA - HV_BASE_REGULAR);
+  } else {
+    args.hv_handle_vmexit_pa = env_offset.HV_HANDLE_VMEXIT_PA;
+    args.hv_code_cave_pa = env_offset.HV_CODE_CAVE_PA;
+  }
+  notify("PREP: hv_base=0x%lx hv_handle_vmexit_pa=0x%lx hv_code_cave_pa=0x%lx\n",
+         (unsigned long)hv_base_now, (unsigned long)args.hv_handle_vmexit_pa,
+         (unsigned long)args.hv_code_cave_pa);
 
   args.linux_info_va = linux_i.linux_info;
 

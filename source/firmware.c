@@ -95,8 +95,10 @@ static int dump_ps5_wifi_firmware(const char *boot_file_path) {
   int fd;
 
   if (env_offset.PS5_WIFI_FW_OFFSET == 0 || env_offset.PS5_WIFI_FW_SIZE == 0) {
-    notify("PS5 WiFi firmware offset missing for firmware %04x\n", fw);
-    return -1;
+    notify("PS5 WiFi firmware dump skipped (no offset for fw %04x) - benign; "
+           "Linux just won't have the wifi blob. Not an error.\n", fw);
+    return 0;  /* benign skip: do NOT report as failure (avoids the misleading */
+               /* "Something went wrong while dumping device firmwares" line) */
   }
 
   if (build_firmware_path(boot_file_path, boot_dir, sizeof(boot_dir), fw_path,

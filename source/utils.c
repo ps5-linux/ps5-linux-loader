@@ -16,9 +16,64 @@ uint64_t cr3;
 uint32_t fw;
 struct linux_info linux_i;
 
+/* ------------------------------------------------------------------ H derivation
+ * Moved here from hv_defeat_13xx.c (2026-10-18) so prepare_resume.c can call it too, to
+ * re-base the HV-absolute offset table fields (HV_HANDLE_VMEXIT_PA, HV_CODE_CAVE_PA) before
+ * hv_defeat_13xx() itself runs derive_H() the "real" time. See HV_BASE_REGULAR in utils.h.
+ *
+ * The carveout base is a RUNTIME value on every console. Our probes measure 0x62800000 on
+ * devkit/base; PS5 Pro retail measures ~0x8e0000000 (confirmed 2026-10-18, real hardware). We
+ * derive it and let the AP payload range-check every VMCB address against [H, H+0x2029000)
+ * before it writes anything. */
+#define OFF_PRELOAD_METADATA_DHB 0x3DF1070UL
+
+uint64_t g_hv_carveout_size;
+
+uint64_t derive_hv_base(void) {
+  uint64_t pm_off = env_offset.PRELOAD_METADATA ? env_offset.PRELOAD_METADATA
+                                               : OFF_PRELOAD_METADATA_DHB;
+  uint64_t pm = kread64(ktext + pm_off);
+  if (!pm || (pm >> 47) != 0x1FFFF)
+    return 0;
+
+  uint64_t p = pm;
+  for (int i = 0; i < 64; i++) {
+    uint32_t type = kread32(p), len = kread32(p + 4);
+    if ((type == 0 && len == 0) || len > 0x10000)
+      break;
+
+    if (type == 0x9004) {
+      uint64_t hdr = p + 8, msize = kread64(hdr), dsize = kread64(hdr + 8);
+      if (dsize >= 0x28 && dsize <= 0x80 && msize && msize < 0x10000) {
+        uint64_t d0 = hdr + 0x20, nd = msize / dsize;
+        for (uint64_t j = 0; j < nd && j < 64; j++) {
+          uint64_t d = d0 + j * dsize;
+          uint32_t ty = kread32(d);
+          uint64_t phys = kread64(d + 8), npg = kread64(d + 24);
+          /* Upper bound raised from 4GB -- see HV_BASE_REGULAR comment in utils.h. */
+          if (ty == 0 && npg * 0x1000UL >= 0x1800000UL && npg * 0x1000UL <= 0x4000000UL
+              && phys && phys < 0x1000000000ULL) {
+            g_hv_carveout_size = npg * 0x1000UL;
+            return phys;
+          }
+        }
+      }
+    }
+    p += 8 + ((len + 7UL) & ~7UL);
+  }
+  return 0;
+}
+
 int setup_env(void) {
   notify("Welcome to ps5-linux-loader. We'll defeat HV and prepare the system "
          "to boot Linux on sleep resume.\n");
+
+  /* Say WHICH build this is. Two ELFs that differ only in behaviour are otherwise
+   * indistinguishable in the logs, and an unattributable run is a wasted run. */
+#ifndef PS5_BUILD_TAG
+#define PS5_BUILD_TAG "untagged"
+#endif
+  notify("build: " PS5_BUILD_TAG);
   if (set_offsets())
     return -1;
   if (init_global_vars())
@@ -31,77 +86,11 @@ int set_offsets(void) {
   if (fw == 0)
     return -1;
   switch (fw) {
-  case 0x0300:
-    env_offset = off_0300;
-    break;
-  case 0x0310:
-    env_offset = off_0310;
-    break;
-  case 0x0320:
-    env_offset = off_0320;
-    break;
-  case 0x0321:
-    env_offset = off_0321;
-    break;
-  case 0x0400:
-    env_offset = off_0400;
-    break;
-  case 0x0402:
-    env_offset = off_0402;
-    break;
-  case 0x0403:
-    env_offset = off_0403;
-    break;
-  case 0x0450:
-    env_offset = off_0450;
-    break;
-  case 0x0451:
-    env_offset = off_0451;
-    break;
-  case 0x0500:
-    env_offset = off_0500;
-    break;
-  case 0x0502:
-    env_offset = off_0502;
-    break;
-  case 0x0510:
-    env_offset = off_0510;
-    break;
-  case 0x0550:
-    env_offset = off_0550;
-    break;
-  case 0x0600:
-    env_offset = off_0600;
-    break;
-  case 0x0602:
-    env_offset = off_0602;
-    break;
-  case 0x0650:
-    env_offset = off_0650;
-    break;
-  case 0x0700:
-    env_offset = off_0700;
-    break;
-  case 0x0701:
-    env_offset = off_0701;
-    break;
-  case 0x0720:
-    env_offset = off_0720;
-    break;
-  case 0x0740:
-    env_offset = off_0740;
-    break;
-  case 0x0760:
-    env_offset = off_0760;
-    break;
-  case 0x0761:
-    env_offset = off_0761;
-    break;
-  case 0x1360:
+  case 0x1360:   /* 13.60 retail -- base-SKU and Pro (Pro detected at runtime by SoC id) */
     env_offset = off_1360;
     break;
   default:
-    return -1;
+    return -1;   /* 13.60-only loader; all other firmware tables were removed in cleanup */
   }
   return 0;
 }
@@ -135,7 +124,11 @@ uint64_t getpmap(uint64_t proc) {
 uint64_t vtophys_user(uint64_t va) {
   uintptr_t self_pmap = getpmap(kernel_get_proc(getpid()));
   uintptr_t self_pml4 = get_pml4(self_pmap);
-  uint64_t pa = vtophys_custom(va, self_pml4 & 0xFFFFFFFF);
+  /* pm_pml4 is a direct-map VA, not a physical address. Masking it to 32 bits only works
+   * while the kernel PML4 physical happens to sit below 4GB (true on base 13.60, not
+   * guaranteed on PS5 Pro). Subtract the direct-map base instead -- same fix as upstream
+   * ps5-linux-loader PR #47. */
+  uint64_t pa = vtophys_custom(va, self_pml4 - dmap);
   return pa;
 }
 
@@ -144,7 +137,9 @@ uint64_t vtophys(uint64_t va) { return vtophys_custom(va, cr3); }
 
 // Source: PS5_kldload
 uint64_t vtophys_custom(uint64_t va, uint64_t cr3_custom) {
-  uint64_t table_phys = cr3_custom & 0xFFFFFFFF;
+  /* cr3_custom is already a physical address (pm_cr3, or pm_pml4 - dmap from
+   * vtophys_user). Do NOT mask it: on Pro the PML4 can live above 4GB. PR #47. */
+  uint64_t table_phys = cr3_custom;
 
   for (int level = 0; level < 4; level++) {
     int shift = 39 - (level * 9);
@@ -260,6 +255,41 @@ int pin_to_first_available_core(void) {
   return -1;
 }
 
+/* Reborn's pin convention, required by the khook route in hv_defeat_13xx.
+ *
+ * byepervisor_reborn's util.c carries this comment verbatim:
+ *
+ *     // Sony system so code that makes sense must be commented out
+ *     //mask[0] = (1 << num);
+ *     mask[0] = 1 << (15 - num);
+ *
+ * Reborn deliberately uses the INVERTED index, and our probe port keeps it "exactly as
+ * upstream wrote it". Upstream ps5-linux-loader's pin_to_core above uses the plain `1 << n`
+ * that Reborn commented out -- and the two select DIFFERENT cores.
+ *
+ * This is not cosmetic. Pinning to the wrong core while khook writes common_tss[HOOK_CORE]
+ * sets IST6 for one CPU and raises the #DB on another. Measured on this console: the probe
+ * with this convention ran mode 0 and mode 1 clean, so it is copied here rather than guessed
+ * at. cpuset_setaffinity REFUSES without the kernel_set_ucred_authid elevation -- callers
+ * elevate first.
+ *
+ * The original pin_to_core is left alone because hv_defeat_0304 (3.xx) depends on it. */
+int pin_to_core_reborn(int num) {
+  uint64_t mask[2] = {};
+  cpusetid_t new_id;
+
+  if (cpuset(&new_id))
+    return 1;
+
+  mask[0] = 0xFFFF;
+  mask[1] = 0;
+  cpuset_setaffinity(3, 3, new_id, 8, (const cpuset_t *)mask);
+
+  mask[0] = (uint64_t)1 << (15 - num);
+  mask[1] = 0;
+  return cpuset_setaffinity(3, 1, -1, 0x10, (const cpuset_t *)mask);
+}
+
 void unpin(void) {
   uint64_t m[2] = {0xFFFF, 0};
   cpuset_setaffinity(3, 1, -1, 0x10, (const cpuset_t *)m);
@@ -275,6 +305,12 @@ void notify(const char *fmt, ...) {
 
   notify_internal((uint8_t *)buffer);
   printf("%s", buffer);
+  /* Also persist to /data so a headless probe run can be pulled via ftpsrv
+   * (notify() is screen-only; this gives a durable log). Append, best-effort. */
+  {
+    FILE *lf = fopen("/data/ps5lin_probe.log", "a");
+    if (lf) { fputs((const char *)buffer, lf); fclose(lf); }
+  }
 }
 
 void notify_internal(uint8_t *msg) {
@@ -320,6 +356,14 @@ enum kit_type get_kit_type(void) {
   if (sceKernelIsTestKit()) {
     notify("TestKit detected\n");
     return KIT_TESTKIT;
+  }
+  /* PS5 Pro retail: different physical memory layout (HV carveout near 38GB instead of
+   * ~1.6GB), needs its own e820 map in shellcode_hv/boot_linux.c and its own HV-code-base
+   * offset in hv_defeat_13xx.c/prepare_resume.c. Cross-checked against
+   * github.com/ps5-linux/ps5-linux-loader PR #47, 2026-10-18. */
+  if (sceKernelGetMainSocId() == SOC_ID_PS5_PRO) {
+    notify("PS5 Pro retail console detected\n");
+    return KIT_RETAIL_PRO;
   }
   notify("Retail console detected\n");
   return KIT_RETAIL;

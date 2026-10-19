@@ -1,6 +1,27 @@
 #include "utils.h"
 #include <cpuid.h>
 
+/* Enable the Titania UART from HV / S3-resume context.
+ *
+ * Polarity and addressing here are the OPPOSITE of the GameOS path:
+ *
+ *   GameOS  (runtime payload) : *(u32*)(dmap_base + 0xC0115110) = (1<<9);   // SET
+ *   HV / resume (this code)   : *(u32*)(0xC0115110)            &= ~(1<<9);  // NEGATE
+ *
+ * This file already addresses the UART data registers physically (0xC1010104 /
+ * 0xC101010C) with no dmap, because the HV shellcode runs after CR3 has been switched
+ * to a 1:1 mapping -- so the gate is addressed physically too.
+ *
+ * The register is WRITE-ONLY: it reads back 0 regardless of what was written. Do not
+ * read it back to check, and never conclude the write was discarded from that.
+ *
+ * Must be re-applied on every resume -- needed for sleep/wake under Linux.
+ */
+__attribute__((noinline, optimize("O0"))) void activate_uart_hv(void) {
+  volatile uint32_t *gate = (volatile uint32_t *)0xC0115110ULL;
+  *gate &= ~(1u << 9);
+}
+
 __attribute__((noinline, optimize("O0"))) uint32_t putc_uart(uint8_t tx_byte) {
   volatile uint32_t *uart_tx = (volatile uint32_t *)0xc1010104ULL;
   volatile uint32_t *uart_busy = (volatile uint32_t *)0xc101010cULL;

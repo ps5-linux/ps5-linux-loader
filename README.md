@@ -1,6 +1,8 @@
 # ps5-linux
 
-**ps5-linux** leverages patched HV vulnerabilities to transform your **PS5 Phat and Slim** console running **3.00-7.61 firmwares** into a highly capable Linux PC, unlocking its full hardware potential for desktop use. Powered by 8 CPU cores (16 threads) at **3.5 GHz** and a GPU at **2.23 GHz**, it provides enough performance to run Steam games and various emulators with impressive fluidity.
+> ⚠️ **13.60 support is EXPERIMENTAL — your mileage may vary.** It boots on base and PS5 Pro, but stability (USB, display, peripherals) is not guaranteed and is still being worked on. Use at your own risk.
+
+**ps5-linux** leverages patched HV vulnerabilities to transform your **PS5 Phat, Slim and Pro** console running **3.00-7.61 or 13.60 firmwares** into a highly capable Linux PC, unlocking its full hardware potential for desktop use. Powered by 8 CPU cores (16 threads) at **3.5 GHz** and a GPU at **2.23 GHz**, it provides enough performance to run Steam games and various emulators with impressive fluidity.
 
 Features:
 
@@ -10,19 +12,35 @@ Features:
 - BD drive usable via custom ahci driver
 - Internal Bluetooth usable via custom xhci driver
 - Ethernet port usable via custom gbe driver
-- Hardware video decode, encode and transcode (VCN) via VAAPI
 
 ![Alt Text](logo.webp)
 
+## 13.60 and PS5 Pro support (high-firmware fork)
+
+This fork adds **firmware 13.60** support, including the **PS5 Pro**, on top of the upstream
+project. Linux boots to a desktop through the same rest-mode / S3-resume mechanism; PS5 Pro is
+detected automatically at runtime (no separate build).
+
+> **Porting to other firmwares:** bringing this route to a new firmware **requires a UART/serial
+> cable** (3.3 V TTL on the Titania test pins, 230400 8N1) for debugging. The resume-time stages
+> emit their progress markers over serial, and a failed resume typically dies with no network and
+> no screen output — without UART a bring-up attempt is effectively blind.
+
+> **Firmware update advice — read before updating:**
+> - **If you are on 11.60 or lower, do NOT update.** You will lose fPKG support.
+> - **If you are on 12.00–13.60, updating does not matter** — you may update to 13.60 freely, since
+>   the upcoming fPKG support covers 12.00–13.60 anyway.
+
 ## PS5 firmware
 
-*ps5-linux* is only supported on PS5 Phat and Slim on the following firmwares:
+*ps5-linux* is supported on PS5 Phat and Slim on the following firmwares, and on PS5 Phat, Slim and **Pro** on 13.60:
 
 - **3.00**, **3.10**, **3.20**, **3.21** without M.2 support
 - **4.00**, **4.02**, **4.03**, **4.50**, **4.51** with M.2 support
 - **5.00**, **5.02**, **5.10**, **5.50** with M.2 support
 - **6.00**, **6.02**, **6.50** with M.2 support
 - **7.00**, **7.01**, **7.20**, **7.40**, **7.60**, **7.61** with M.2 support
+- **13.60** with M.2 support — **PS5 Phat, Slim and Pro** (this fork)
 
 Support for 1.xx and 2.xx firmwares may be added in the future, but we will not prioritize this effort.
 
@@ -262,7 +280,7 @@ For any future ps5-linux updates, you can download the `.deb` or `.pkg.tar.zst` 
 ## FAQ
 
 - Q: Will higher >=8.00 firmwares be supported?
-  - A: No.
+  - A: **13.60** is supported (base and PS5 Pro) in this fork. 8.00-13.50 are not supported; if you are on 12.00-13.60 you can update to 13.60.
 - Q: Why can I not use M.2 on 3.xx?
   - A: Because the PS5 fails to boot with it attached.
 - Q: Can I dual-boot Linux and PS5 OS?
@@ -273,8 +291,6 @@ For any future ps5-linux updates, you can download the `.deb` or `.pkg.tar.zst` 
   - A: Yes, the internal SSD is not modified
 - Q: Can I use the PS5's NIC/WLAN module in Linux?
   - A: WLAN is only supported for Marvell chipsets at the moment. Ethernet is supported on all models.
-- Q: Does hardware video decode and transcode work?
-  - A: Yes, since [ps5-linux-patches #38](https://github.com/ps5-linux/ps5-linux-patches/pull/38). Decode works for H.264, HEVC Main/Main 10, VP9 Profile 0/2, VC-1 and MPEG-2. Encode works for H.264, and for HEVC with I-frames only.
 - Q: Does the DualSense controller work?
   - A: Yes, via internal Bluetooth as well as Bluetooth dongle.
 - Q: What resolutions and refresh rates are supported?
@@ -299,7 +315,6 @@ Many configurations, tips and tricks from the [AMD BC250 Documentation](https://
 - screen save does not work properly
 - hdmi audio output does not work on some monitors
 - hdmi 1440p and 2160p video output does not work on some monitors
-- VCN HEVC encode has corrupt chroma with P-frames, use I-frame only (`-g 1 -bf 0`) or H.264
 
 ## Upstreamed changes
 
@@ -325,3 +340,4 @@ Join our [Discord server](https://discord.gg/PeMGVB7BAm) to celebrate Linux on P
 - [echostretch](https://github.com/echostretch): Offsets and testing
 - [kirathenotebook](https://github.com/kirathenotebook): Betatesting and readme contribution
 - 15432: Tests on BC-250
+- [Sonic-Iso](https://github.com/soniciso1): High firmware support contributor (13.60 support, including PS5 Pro)

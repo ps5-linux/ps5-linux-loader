@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 
+/* HV/resume-context UART enable: NEGATES bit (1<<9) at PHYSICAL 0xC0115110.
+ * Opposite polarity and addressing to the GameOS path, which SETs it via dmap.
+ * Write-only register -- do not read back. Re-apply on every resume (sleep/wake). */
+void activate_uart_hv(void);
+
 uint32_t putc_uart(uint8_t tx_byte);
 int printf(const uint8_t *msg);
 

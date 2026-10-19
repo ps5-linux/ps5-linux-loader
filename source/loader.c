@@ -3,6 +3,7 @@
 #include "firmware.h"
 #include "linux.h"
 #include "utils.h"
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,8 +70,7 @@ long find_and_get_size_of_file(const char *filename, char *found_path) {
     snprintf(full_path, sizeof(full_path), "%s%s", file_paths[i], filename);
 
     if (stat(full_path, &st) == 0) {
-      notify("File '%s' found in '%s' - rmux was here\n", filename,
-             file_paths[i]);
+      notify("File '%s' found in '%s'\n", filename, file_paths[i]);
       strcpy(found_path, full_path);
       return st.st_size;
     }
@@ -126,11 +126,23 @@ int fetch_linux(struct linux_info *info) {
     return -1;
   }
 
-  void *bzimage =
-      mmap(NULL, ALIGN_UP(bzimage_size, PAGE_SIZE), PROT_READ | PROT_WRITE,
-           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  size_t bzimage_map = ALIGN_UP(bzimage_size, PAGE_SIZE);
+  void *bzimage = mmap(NULL, bzimage_map, PROT_READ | PROT_WRITE,
+                       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   if (bzimage == MAP_FAILED) {
-    notify("[-] Error could not allocate bzimage.\n");
+    /* REPORT WHY (added 2026-10-13 after a 12,705,792-byte request came back MAP_FAILED on a
+     * console whose card was provably fine). A ~12 MiB anonymous mmap does not fail for lack of
+     * memory on a healthy PS5 OS, so errno is the entire diagnosis:
+     *   ENOMEM(12) -> the console's VM really is exhausted. That is what a console that was NOT
+     *                 cold-booted looks like -- CONTEXT §9e requires a reboot before this loader,
+     *                 because the previous session leaves kernel .text RW/XOTEXT-cleared and the
+     *                 16 VMCBs cleared, and this loader then arms on top of that.
+     *   EINVAL(22) -> the request is malformed, i.e. a bogus size came back from the FAT.
+     *   anything else -> the mapping cannot be backed at all.
+     * errno is captured before notify(), which may clobber it. Only runs on the failure path. */
+    int e = errno;
+    notify("[-] Error could not allocate bzimage (%d bytes, errno %d).\n",
+           (int)bzimage_map, e);
     return -1;
   }
 
@@ -147,11 +159,13 @@ int fetch_linux(struct linux_info *info) {
     return -1;
   }
 
-  void *initrd =
-      mmap(NULL, ALIGN_UP(initrd_size, PAGE_SIZE), PROT_READ | PROT_WRITE,
-           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  size_t initrd_map = ALIGN_UP(initrd_size, PAGE_SIZE);
+  void *initrd = mmap(NULL, initrd_map, PROT_READ | PROT_WRITE,
+                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   if (initrd == MAP_FAILED) {
-    notify("[-] Error could not allocate initrd.\n");
+    int e = errno;
+    notify("[-] Error could not allocate initrd (%d bytes, errno %d).\n",
+           (int)initrd_map, e);
     return -1;
   }
 
@@ -192,6 +206,35 @@ int fetch_linux(struct linux_info *info) {
     strcpy(cmdline, CMD_LINE);
   } else {
     trim_newline(cmdline);
+  }
+
+  /* Injected boot options.
+   *
+   * The loader owns Linux's command line, so a test can be run without touching the card.
+   *
+   * `nomodeset` WAS HERE AND IS NOW REMOVED (2026-10-13, late). It had already answered its
+   * question -- it is what proved the display is dead BEFORE Linux starts -- and leaving it in
+   * would make the current goal unreachable: with modesetting disabled amdgpu never binds, so
+   * NOTHING can scan out to the panel even if the PS5 op sequence powers the FLAVA3 perfectly.
+   * A run with it in place cannot show a picture by construction.
+   *
+   * Removing it is not a behaviour change for the exploit: the ops (and every marker) run in the
+   * shellcode BEFORE Linux starts, so modesetting cannot affect whether they execute or whether
+   * Linux boots. Measured, not assumed -- the two boots at com3.log 106857 and 112868 carried
+   * `video=DP-1:... amdgpu.force_1080p=1 drm.debug=0x116` and NO nomodeset, and both reached a
+   * login prompt. So amdgpu binding does not prevent the boot.
+   *
+   * Do NOT re-add `drm.debug`: it floods the UART and is what makes the SCK> markers unreadable.
+   * Change this one string to try other options (amdgpu.dc=0, amdgpu.modeset=0, ...). */
+#define EXTRA_CMDLINE ""
+  {
+    size_t l = strlen(cmdline);
+    size_t i = 0;
+    while (EXTRA_CMDLINE[i] && l + i < sizeof(cmdline) - 1) {
+      cmdline[l + i] = EXTRA_CMDLINE[i];
+      i++;
+    }
+    cmdline[l + i] = '\0';
   }
 
   info->linux_info = kernel_cave_linux_info;

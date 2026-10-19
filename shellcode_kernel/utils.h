@@ -49,6 +49,8 @@ void memcpy(void *dest, void *src, uint64_t len);
 uint32_t putc_uart(uint64_t dmap, uint8_t tx_byte);
 int puts_uart(uint64_t dmap, const uint8_t *msg);
 void activate_uart(volatile shellcode_kernel_args *args_ptr);
+void mark(volatile shellcode_kernel_args *args_ptr, const char *s);
+void mark_hex(volatile shellcode_kernel_args *args_ptr, const char *label, uint64_t v);
 void halt(void);
 void init_global_pointers(volatile shellcode_kernel_args *args_ptr);
 uint8_t get_cpu(void);

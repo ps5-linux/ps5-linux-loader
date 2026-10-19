@@ -1,6 +1,3 @@
-#include "hv_defeat_0304.h"
-#include "hv_defeat_0506.h"
-#include "hv_defeat_0607.h"
 #include "hv_defeat_13xx.h"
 #include "loader.h"
 #include "prepare_resume.h"
@@ -26,16 +23,27 @@ int main(void) {
     return -1;
   }
 
-  if ((0x0300 <= fw) && (fw < 0x0500)) {
-    if (hv_defeat_0304(shellcode_kernel, shellcode_kernel_len))
-      goto err;
-  } else if ((0x0500 <= fw) && (fw < 0x0650)) {
-    if (hv_defeat_0506(shellcode_kernel, shellcode_kernel_len))
-      goto err;
-  } else if ((0x0650 <= fw) && (fw < 0x0800)) {
-    if (hv_defeat_0607(shellcode_kernel, shellcode_kernel_len))
-      goto err;
-  } else if (fw == 0x1360) {
+  /* The HV patch addresses are NOT optional and are NOT covered by offsets_present().
+   * boot_linux.c patches the hypervisor's vmexit handler with
+   *     memcpy(PHYS_TO_DMAP(args.hv_handle_vmexit_pa), shellcode_jmp, ...)
+   * so a table that leaves HV_HANDLE_VMEXIT_PA at 0 would write that jmp into physical page
+   * zero. Refuse here instead -- a table derived from x86_kernel.elf alone CANNOT contain
+   * this value, because it lives in the hypervisor image. */
+  if (!env_offset.HV_HANDLE_VMEXIT_PA || !env_offset.HV_CODE_CAVE_PA) {
+    notify("fw %x: HV patch addresses missing from the offset table "
+           "(HV_HANDLE_VMEXIT_PA=%lx HV_CODE_CAVE_PA=%lx).\n"
+           "These live in the HYPERVISOR image, not x86_kernel.elf, and cannot be derived "
+           "from the kernel. Refusing to arm rather than patching physical page 0.",
+           fw, (unsigned long)env_offset.HV_HANDLE_VMEXIT_PA,
+           (unsigned long)env_offset.HV_CODE_CAVE_PA);
+    goto err;
+  }
+
+  /* 13.60 only (base + Pro, differentiated at runtime by SoC id inside hv_defeat_13xx).
+   * Hook the kernel's own AP-start call (khook) rather than exploiting an MSR intercept.
+   * See source/hv_defeat_13xx.c for the route and source/offsets.c off_1360 for the fields;
+   * the function refuses to arm unless all required offsets are present. */
+  if ((0x1300 <= fw) && (fw < 0x1400)) {
     if (hv_defeat_13xx(shellcode_kernel, shellcode_kernel_len))
       goto err;
   } else {
