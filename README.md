@@ -27,7 +27,7 @@ Features:
 - **13.00**, **13.20**, **13.60** with M.2 support
 
 **PS5 Pro:**
-- **13.60**
+- **13.60** with M.2 support
 
 Support for 1.xx and 2.xx firmwares may be added in the future, but we will not prioritize this effort.
 
@@ -330,3 +330,4 @@ Join our [Discord server](https://discord.gg/PeMGVB7BAm) to celebrate Linux on P
 - [echostretch](https://github.com/echostretch): Offsets and testing
 - [kirathenotebook](https://github.com/kirathenotebook): Betatesting and readme contribution
 - 15432: Tests on BC-250
+- [DeathlySin](https://github.com/DeathlySin): PS5 Pro support (E820 memory map, I/O fix)
