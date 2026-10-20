@@ -36,7 +36,7 @@ __attribute__((section(".entry_point"))) uint32_t main(uint64_t add1,
   } else if ((0x0500 <= args_ptr->fw_version) &&
              (args_ptr->fw_version < 0x0800)) {
     // Already escaped.
-  } else if (args_ptr->fw_version == 0x1360) {
+  } else if (args_ptr->fw_version == 0x1320 || args_ptr->fw_version == 0x1360) {
     // Already escaped.
   } else {
     return 0;
