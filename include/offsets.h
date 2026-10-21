@@ -101,6 +101,8 @@ extern offset_list off_0760;
 extern offset_list off_0761;
 extern offset_list off_1300;
 extern offset_list off_1320;
+extern offset_list off_1340;
+extern offset_list off_1342;
 extern offset_list off_1360;
 
 #endif

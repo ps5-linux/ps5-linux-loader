@@ -104,7 +104,7 @@ int prepare_resume(void **shellcode_kernel, size_t *shellcode_kernel_len) {
 
   const uint8_t *shellcode_src = shellcode_kernel_bin;
   size_t shellcode_len = shellcode_kernel_bin_len;
-  if (fw == 0x1300 || fw == 0x1320) {
+  if (fw == 0x1300 || fw == 0x1320 || fw == 0x1340 || fw == 0x1342) {
     shellcode_src = shellcode_kernel_13xx_bin;
     shellcode_len = shellcode_kernel_13xx_bin_len;
   } else if (fw == 0x1360 && linux_i.kit_type != KIT_RETAIL_PRO) {
@@ -197,7 +197,8 @@ uint64_t prepare_sck_args(void) {
   args.kernel_cfi_check = ktext + env_offset.KERNEL_CFI_CHECK;
   args.hv_handle_vmexit_pa = env_offset.HV_HANDLE_VMEXIT_PA;
   args.hv_code_cave_pa = env_offset.HV_CODE_CAVE_PA;
-  if ((fw == 0x1320 || fw == 0x1360) && linux_i.kit_type == KIT_RETAIL_PRO) {
+  if ((fw == 0x1320 || fw == 0x1340 || fw == 0x1342 || fw == 0x1360) &&
+      linux_i.kit_type == KIT_RETAIL_PRO) {
     uint64_t pro_base = derive_h() + HV_CODE_OFFSET_PRO;
     uint64_t hv_offset = pro_base - HV_BASE_REGULAR;
     args.hv_handle_vmexit_pa += hv_offset;
