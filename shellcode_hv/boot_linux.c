@@ -94,10 +94,9 @@ static void e820_memory_setup(struct boot_params *bp) {
 
   if (info.kit_type == KIT_RETAIL_PRO) {
     append_e820_table(bp, 0x470000000, 0x47f300000, E820_TYPE_RAM);
-    append_e820_table(bp, 0x47f300000, 0x880000000, E820_TYPE_RESERVED);
-    append_e820_table(bp, 0x880000000, 0x8e0000000, E820_TYPE_RAM);
+    append_e820_table(bp, 0x47f300000, 0x8e0000000, E820_TYPE_RESERVED);
     append_e820_table(bp, 0x8e0000000, 0x8e2000000, E820_TYPE_RESERVED); // HV
-    append_e820_table(bp, 0x8e2000000, 0x900000000, E820_TYPE_RAM);
+    append_e820_table(bp, 0x8e2000000, 0x900000000, E820_TYPE_RESERVED);
   }
   // DevKits have 32GB
   else if (info.kit_type != KIT_DEVKIT) {
