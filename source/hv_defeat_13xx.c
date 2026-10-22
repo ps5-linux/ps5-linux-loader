@@ -97,7 +97,7 @@ uint64_t kgadget(kgadget_t gadget) {
 }
 
 static int offsets_present(void) {
-  if (fw != 0x1300 && fw != 0x1320 && fw != 0x1360)
+  if (fw != 0x1300 && fw != 0x1320 && fw != 0x1340 && fw != 0x1342 && fw != 0x1360)
     return 0;
 
   const uint64_t required[] = {
@@ -400,7 +400,7 @@ int hv_defeat_13xx(void *shellcode_kernel, size_t shellcode_kernel_len) {
   uint64_t waking_vector;
   int result;
 
-  if ((fw != 0x1300 && fw != 0x1320 && fw != 0x1360) || !shellcode_kernel ||
+  if ((fw != 0x1300 && fw != 0x1320 && fw != 0x1340 && fw != 0x1342 && fw != 0x1360) || !shellcode_kernel ||
       !shellcode_kernel_len || !offsets_present()) {
     if (fw == 0x1360)
       notify("13.60 offsets incomplete\n");

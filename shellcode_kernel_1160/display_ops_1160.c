@@ -100,6 +100,7 @@ dispatch_ps5_display_op_1160(uint32_t index) {
   case 0x1140: op = &ps5_display_ops_1140[index]; break;
   default:     op = &ps5_display_ops_1160[index]; break;
   }
+  const ps5_display_op_1160 *op = &ps5_display_ops_1160[index];
   const uintptr_t target = args.ktext + op->ktext_offset;
 
   if (op->mode == 2)

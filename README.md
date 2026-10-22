@@ -134,6 +134,9 @@ The front top Type-A port is USB 2.0 which is slower and thus not recommended.
 1. Install Y2JB by following https://github.com/Gezine/Y2JB.
 2. Run kernel exploit: `python3 payload_sender.py $PS5IP 50000 payloads/lapse.js`
 
+#### Firmware 7.61-13.60
+1. Install WebKit Autoloader by following https://github.com/itsPLK/ps5-webkit-autoloader
+
 ### 5. Send the payload
 If you're on ARM64 Linux, first install the x86-64 cross-compilation tools before:
 

@@ -21,6 +21,7 @@ static inline int validate_shellcode_kernel_args_1160(
        candidate->fw_version != 0x1120 &&
        candidate->fw_version != 0x1140 &&
        candidate->fw_version != 0x1160))
+  if (candidate == NULL || candidate->fw_version != 0x1160)
     return -1;
 
   if (!shellcode_kernel_va_is_canonical(candidate->ktext) ||
