@@ -1,0 +1,76 @@
+name: Build PS5 Linux Loader
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            make \
+            git \
+            cmake \
+            python3 \
+            python3-pip \
+            wget \
+            lsb-release \
+            software-properties-common
+
+      - name: Install LLVM 18
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18
+          sudo apt-get install -y clang-18 lld-18
+
+      - name: Download and install PS5 Payload SDK
+        run: |
+          mkdir -p "$RUNNER_TEMP/ps5-sdk"
+          cd "$RUNNER_TEMP/ps5-sdk"
+
+          wget -O sdk.zip \
+            https://github.com/ps5-payload-dev/sdk/releases/latest/download/ps5-payload-sdk.zip
+
+          sudo apt-get install -y unzip
+          sudo unzip -o sdk.zip -d /opt
+
+          test -f /opt/ps5-payload-sdk/toolchain/prospero.mk
+
+          echo "PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk" >> "$GITHUB_ENV"
+          echo "/opt/ps5-payload-sdk/bin" >> "$GITHUB_PATH"
+
+      - name: Verify SDK
+        run: |
+          test -f "$PS5_PAYLOAD_SDK/toolchain/prospero.mk"
+          test -x "$PS5_PAYLOAD_SDK/bin/prospero-clang"
+
+          echo "SDK installed successfully."
+
+      - name: Build project
+        run: |
+          make -j"$(nproc)"
+
+      - name: Verify build output
+        run: |
+          test -f bin/ps5-linux-loader.elf
+          file bin/ps5-linux-loader.elf
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps5-linux-loader
+          path: bin/ps5-linux-loader.elf
+          if-no-files-found: error
