@@ -105,6 +105,7 @@ extern offset_list off_1140;
 extern offset_list off_1160;
 extern offset_list off_1200;
 extern offset_list off_1202;
+extern offset_list off_1220;
 extern offset_list off_1240;
 extern offset_list off_1270;
 extern offset_list off_1300;
