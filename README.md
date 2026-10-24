@@ -167,7 +167,7 @@ If the LED is white, but you still have a blackscreen then:
 - Try different monitors or capture cards, ideally with different resolutions. Currently, some monitors have issues.
 - Try setting `amdgpu.force_1080p=1` in `cmdline.txt` in the FAT32 partition of the USB drive.
 
-If none of this helps, please report the issue in our [Discord server](https://discord.gg/PeMGVB7BAm) and provide your EDID information.
+If none of this helps, please report the issue in our [Discord server](https://discord.gg/CRzZ9N9E6t) and provide your EDID information.
 
 
 ## First Boot
@@ -230,7 +230,7 @@ cd ps5-linux-tools
 sudo ./m2_init
 ```
 
-4. Reboot via `sudo reboot`. If your PS5 asks you to format your M.2 again, please report this issue to us in our [Discord server](https://discord.gg/PeMGVB7BAm) and provide your M.2 model and storage size.
+4. Reboot via `sudo reboot`. If your PS5 asks you to format your M.2 again, please report this issue to us in our [Discord server](https://discord.gg/CRzZ9N9E6t) and provide your M.2 model and storage size.
 5. Relaunch Linux on your PS5.
 6. Copy the `ps5-ubuntu2604.img` image that you built during installation or rebuild it on your PS5. Then, install it onto your M.2:
 
@@ -319,7 +319,7 @@ During this project, we have upstreamed some changes:
 
 ## Discord
 
-Join our [Discord server](https://discord.gg/PeMGVB7BAm) to celebrate Linux on PS5, receive help, learn tips & tricks, join development, or report issues.
+Join our [Discord server](https://discord.gg/CRzZ9N9E6t) to celebrate Linux on PS5, receive help, learn tips & tricks, join development, or report issues.
 
 ## Credits
 
