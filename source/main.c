@@ -48,7 +48,8 @@ int main(void) {
   } else if ((0x0650 <= fw) && (fw < 0x0800)) {
     if (hv_defeat_0607(shellcode_kernel, shellcode_kernel_len))
       goto err;
-  } else if (fw == 0x1300 || fw == 0x1320 || fw == 0x1340 || fw == 0x1342 || fw == 0x1360) {
+  } else if (PS5_FW_IS_12XX(fw) || fw == 0x1300 || fw == 0x1320 ||
+             fw == 0x1340 || fw == 0x1342 || fw == 0x1360) {
     if (hv_defeat_13xx(shellcode_kernel, shellcode_kernel_len))
       goto err;
   } else if (PS5_FW_IS_11XX(fw)) {

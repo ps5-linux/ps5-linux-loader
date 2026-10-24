@@ -158,7 +158,8 @@ int prepare_resume(void **shellcode_kernel, size_t *shellcode_kernel_len) {
 
   const uint8_t *shellcode_src = shellcode_kernel_bin;
   size_t shellcode_len = shellcode_kernel_bin_len;
-  if (fw == 0x1300 || fw == 0x1320 || fw == 0x1340 || fw == 0x1342) {
+  if (PS5_FW_IS_12XX(fw) || fw == 0x1300 || fw == 0x1320 || fw == 0x1340 ||
+      fw == 0x1342) {
     shellcode_src = shellcode_kernel_13xx_bin;
     shellcode_len = shellcode_kernel_13xx_bin_len;
   } else if (fw == 0x1360 && linux_i.kit_type != KIT_RETAIL_PRO) {
@@ -169,7 +170,8 @@ int prepare_resume(void **shellcode_kernel, size_t *shellcode_kernel_len) {
     shellcode_len = shellcode_kernel_1160_bin_len;
   }
 
-  if ((fw == 0x1300 || fw == 0x1320) && shellcode_len > 0x3910)
+  if ((PS5_FW_IS_12XX(fw) || fw == 0x1300 || fw == 0x1320) &&
+      shellcode_len > 0x3910)
     return -1;
   if (PS5_FW_IS_11XX(fw) && shellcode_len > 0x5000)
     return -1;
@@ -256,8 +258,8 @@ uint64_t prepare_sck_args(void) {
   args.kernel_cfi_check = ktext + env_offset.KERNEL_CFI_CHECK;
   args.hv_handle_vmexit_pa = env_offset.HV_HANDLE_VMEXIT_PA;
   args.hv_code_cave_pa = env_offset.HV_CODE_CAVE_PA;
-  if ((PS5_FW_IS_11XX(fw) || fw == 0x1320 || fw == 0x1340 || fw == 0x1342 ||
-       fw == 0x1360) &&
+  if ((PS5_FW_IS_11XX(fw) || PS5_FW_IS_12XX(fw) || fw == 0x1320 ||
+       fw == 0x1340 || fw == 0x1342 || fw == 0x1360) &&
       linux_i.kit_type == KIT_RETAIL_PRO) {
     uint64_t pro_base = derive_h() + HV_CODE_OFFSET_PRO;
     uint64_t hv_offset = pro_base - HV_BASE_REGULAR;

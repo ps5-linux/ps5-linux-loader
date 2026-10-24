@@ -29,7 +29,7 @@ __attribute__((section(".entry_point"))) uint32_t main(uint64_t add1,
   }
 
 #if defined(FW_13XX_PORT)
-  if (args_ptr->fw_version < 0x1300 || args_ptr->fw_version >= 0x1400)
+  if (args_ptr->fw_version < 0x1200 || args_ptr->fw_version >= 0x1400)
     return -1;
   activate_uart(args_ptr);
 #elif defined(FW_1160)

@@ -97,7 +97,8 @@ uint64_t kgadget(kgadget_t gadget) {
 }
 
 static int offsets_present(void) {
-  if (fw != 0x1300 && fw != 0x1320 && fw != 0x1340 && fw != 0x1342 && fw != 0x1360)
+  if (!PS5_FW_IS_12XX(fw) && fw != 0x1300 && fw != 0x1320 && fw != 0x1340 &&
+      fw != 0x1342 && fw != 0x1360)
     return 0;
 
   const uint64_t required[] = {
@@ -184,6 +185,9 @@ static int check_nvs_signature(void) {
 
 uint64_t derive_h(void) {
   uint64_t record;
+
+  if (!env_offset.HV_EFI_MAP_ROOT)
+    return 0;
 
   if (kernel_read(ktext + env_offset.HV_EFI_MAP_ROOT, &record, sizeof(record)) ||
       !record || (record >> 47) != 0x1FFFF)
@@ -400,7 +404,8 @@ int hv_defeat_13xx(void *shellcode_kernel, size_t shellcode_kernel_len) {
   uint64_t waking_vector;
   int result;
 
-  if ((fw != 0x1300 && fw != 0x1320 && fw != 0x1340 && fw != 0x1342 && fw != 0x1360) || !shellcode_kernel ||
+  if ((!PS5_FW_IS_12XX(fw) && fw != 0x1300 && fw != 0x1320 && fw != 0x1340 &&
+       fw != 0x1342 && fw != 0x1360) || !shellcode_kernel ||
       !shellcode_kernel_len || !offsets_present()) {
     if (fw == 0x1360)
       notify("13.60 offsets incomplete\n");
