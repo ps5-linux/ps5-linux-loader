@@ -26,6 +26,11 @@
 #define FW_1100_RAW 0x11000043U
 #define FW_1120_RAW 0x11200005U
 #define FW_1140_RAW 0x11400005U
+#define FW_1000_RAW 0x10000046U
+#define FW_1001_RAW 0x10010000U
+#define FW_1020_RAW 0x10200006U
+#define FW_1040_RAW 0x10400007U
+#define FW_1060_RAW 0x10600006U
 #define FW_1160_RAW 0x11600005U
 #define PS5_PRO_SOC_ID 0x840fd0
 #define NCPU 16
@@ -127,17 +132,31 @@ static int offsets_present(void) {
   case 0x1100: expected_raw = FW_1100_RAW; break;
   case 0x1120: expected_raw = FW_1120_RAW; break;
   case 0x1140: expected_raw = FW_1140_RAW; break;
+  case 0x1000: expected_raw = FW_1000_RAW; break;
+  case 0x1001: expected_raw = FW_1001_RAW; break;
+  case 0x1020: expected_raw = FW_1020_RAW; break;
+  case 0x1040: expected_raw = FW_1040_RAW; break;
+  case 0x1060: expected_raw = FW_1060_RAW; break;
   case 0x1160: expected_raw = FW_1160_RAW; break;
   default: return 0;
   }
   if (kernel_get_fw_version() != expected_raw)
     return 0;
-  /* Every 11.x build shares the same hypervisor image and CC cave. */
-  if (env_offset.HV_CODE_CAVE_PA != 0x62806F00ULL ||
-      env_offset.HV_HANDLE_VMEXIT_PA != 0x62847551ULL)
+  /* Every 10.x/11.x build shares the same hypervisor image and CC cave. */
+  if (env_offset.HV_CODE_CAVE_PA != 0x62806F00ULL)
     return 0;
-  if (env_offset.KERNEL_CODE_CAVE != 0xD2B000ULL ||
-      env_offset.DATA_CAVE != 0x2D02000ULL)
+  if (fw >= 0x1000 && fw < 0x1050) {
+    if (env_offset.HV_HANDLE_VMEXIT_PA != 0x62847488ULL)
+      return 0;
+  } else if (fw == 0x1060) {
+    if (env_offset.HV_HANDLE_VMEXIT_PA != 0x628474A8ULL)
+      return 0;
+  } else if (env_offset.HV_HANDLE_VMEXIT_PA != 0x62847551ULL) {
+    return 0;
+  }
+  if (fw >= 0x1100 &&
+      (env_offset.KERNEL_CODE_CAVE != 0xD2B000ULL ||
+       env_offset.DATA_CAVE != 0x2D02000ULL))
     return 0;
   for (size_t i = 0; i < sizeof(required) / sizeof(required[0]); i++)
     if (required[i] == 0)
