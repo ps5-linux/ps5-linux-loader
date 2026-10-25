@@ -627,6 +627,53 @@ static int take_sx_stack_page_1160(const struct alias_tx_1160 *tx,
  * present, the DMAP tables for the copy and the code cave with the tables that
  * map it.
  */
+/* 10.x takes the #SX stack page without the 11.60 alias transaction. A batch
+ * whose PAs do not resolve is kept mapped and the next round retried; the pair
+ * must not overlap the fixed destination the shared wake blob copies into. */
+int take_sx_stack_page_10xx(uint64_t copy_lo, uint64_t copy_hi) {
+  uint8_t *batch;
+  uint64_t pas[SX_STACK_BATCH_1160];
+  uint64_t pa = 0;
+  int round;
+
+  for (round = 0; round < SX_STACK_ROUNDS_1160; round++) {
+    int zero = 0, pairs = 0;
+    batch = mmap(NULL, SX_STACK_BATCH_1160 * PAGE_SIZE,
+                 PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (batch == MAP_FAILED) {
+      notify("%04x sx: mmap failed round %d\n", fw, round);
+      return -1;
+    }
+    memset(batch, 0, SX_STACK_BATCH_1160 * PAGE_SIZE);
+    for (size_t i = 0; i < SX_STACK_BATCH_1160; i++) {
+      pas[i] = vtophys_user((uintptr_t)batch + i * PAGE_SIZE);
+      if (!pas[i])
+        zero++;
+    }
+    printf("%04x sx r%d first=0x%llx zero=%d\n", fw, round,
+           (unsigned long long)pas[0], zero);
+    if (zero)
+      continue;
+    if (!find_sx_stack_pair_1160(pas, SX_STACK_BATCH_1160, &pa)) {
+      uint64_t under = pa - PAGE_SIZE;
+      int hit = (pa + PAGE_SIZE > copy_lo && pa < copy_hi) ||
+                (under + PAGE_SIZE > copy_lo && under < copy_hi);
+      pairs = 1;
+      if (!hit) {
+        sx_stack_pa_1160 = pa;
+        notify("%04x sx: page 0x%llx under 0x%llx (round %d)\n", fw,
+               (unsigned long long)pa, (unsigned long long)under, round);
+        return 0;
+      }
+    }
+    printf("%04x sx r%d pairs=%d rejected=%d\n", fw, round, pairs,
+           pairs ? 1 : 0);
+  }
+  notify("%04x sx: no usable pair in %d rounds\n", fw,
+         (int)SX_STACK_ROUNDS_1160);
+  return -1;
+}
+
 static int preflight_wake_copy_1160(const struct alias_tx_1160 *tx,
                                     const struct alias_page_1160 *pages,
                                     size_t page_count) {

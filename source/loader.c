@@ -204,7 +204,7 @@ int fetch_linux(struct linux_info *info) {
   info->kit_type = (int)get_kit_type();
   strcpy(info->cmdline, cmdline);
 
-  if (PS5_FW_IS_11XX(fw)) {
+  if (PS5_FW_IS_11XX(fw) && !(fw >= 0x1000 && fw < 0x1100)) {
     // 11.60 stages the aliases with a checked, journaled transaction instead
     // of the install_page_syscore loop below.
     int staged = stage_linux_aliases_1160(
@@ -238,5 +238,17 @@ int fetch_linux(struct linux_info *info) {
                          0);
   }
 
+  /* 10.x stages exactly like 13.x; it only needs the #SX stack page that the
+   * 11.60 transaction used to take. */
+  if (fw >= 0x1000 && fw < 0x1100) {
+    uint64_t copy_lo = cave_bzImage;
+    uint64_t copy_hi = cave_bzImage +
+                       ALIGN_UP((uint64_t)bzimage_size, PAGE_SIZE) +
+                       ALIGN_UP((uint64_t)initrd_size, PAGE_SIZE);
+    if (take_sx_stack_page_10xx(copy_lo, copy_hi)) {
+      notify("%04x could not take the #SX stack page\n", fw);
+      return -1;
+    }
+  }
   return 0;
 }

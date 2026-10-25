@@ -233,14 +233,15 @@ static void gate_encode(uint64_t target, uint16_t selector, uint8_t ist,
   *hi = (target >> 32) & 0xffffffffULL;
 }
 
-static int verify_tss_layout(uint64_t tss_base, uint64_t saved[NCPU]) {
+static int verify_tss_layout(uint64_t tss_base, uint64_t saved[NCPU],
+                             int db_ist) {
   uint64_t rsp0[NCPU];
   uint64_t ist4[NCPU];
 
   for (int cpu = 0; cpu < NCPU; cpu++) {
     uint64_t base = tss_base + (uint64_t)cpu * TSS_STRIDE;
     rsp0[cpu] = kread64(base + 0x04);
-    ist4[cpu] = kread64(base + TSS_IST(4));
+    ist4[cpu] = kread64(base + TSS_IST(db_ist));
     saved[cpu] = kread64(tss_ist_slot(tss_base, cpu, 6));
     if ((rsp0[cpu] >> 47) != 0x1ffffULL || ist4[cpu] == 0 || saved[cpu] != 0)
       return -1;
@@ -443,9 +444,18 @@ static int arm_startup_carrier(uint64_t resume_cave) {
   if (break_hv_bin_len == 0 || break_hv_bin_len > sizeof(staged) ||
       kread64(resume_cave + CAVE_SAVE_OFF + SAVE_STATE) != 0)
     return -1;
-  if (!((saved_gate_lo >> 47) & 1) || ((saved_gate_lo >> 32) & 7) != 4 ||
-      verify_tss_layout(tss_base, saved_ist))
-    return -2;
+  {
+    int gate_p = (int)((saved_gate_lo >> 47) & 1);
+    int gate_ist = (int)((saved_gate_lo >> 32) & 7);
+    int tss_rc = (gate_p && gate_ist >= 1 && gate_ist <= 7)
+                     ? verify_tss_layout(tss_base, saved_ist, gate_ist)
+                     : -1;
+    if (!gate_p || gate_ist < 1 || gate_ist > 7 || tss_rc) {
+      notify("%04x arm gate: lo=0x%llx P=%d ist=%d tss=%d\n", fw,
+             (unsigned long long)saved_gate_lo, gate_p, gate_ist, tss_rc);
+      return -2;
+    }
+  }
 
   gate_encode(kg(env_offset.GAD_PIVOT_ADD_RSP28_RET),
               (uint16_t)(saved_gate_lo >> 16), 6, &gate_lo, &gate_hi);
