@@ -97,6 +97,41 @@ int set_offsets(void) {
   case 0x0761:
     env_offset = off_0761;
     break;
+  case 0x1000:
+    if (kernel_get_fw_version() != 0x10000046U) {
+      notify("Only the retail 10.00 build (0x10000046) is supported\n");
+      return -1;
+    }
+    env_offset = off_1000;
+    break;
+  case 0x1001:
+    if (kernel_get_fw_version() != 0x10010000U) {
+      notify("Only the retail 10.01 build (0x10010000) is supported\n");
+      return -1;
+    }
+    env_offset = off_1001;
+    break;
+  case 0x1020:
+    if (kernel_get_fw_version() != 0x10200006U) {
+      notify("Only the retail 10.20 build (0x10200006) is supported\n");
+      return -1;
+    }
+    env_offset = off_1020;
+    break;
+  case 0x1040:
+    if (kernel_get_fw_version() != 0x10400007U) {
+      notify("Only the retail 10.40 build (0x10400007) is supported\n");
+      return -1;
+    }
+    env_offset = off_1040;
+    break;
+  case 0x1060:
+    if (kernel_get_fw_version() != 0x10600006U) {
+      notify("Only the retail 10.60 build (0x10600006) is supported\n");
+      return -1;
+    }
+    env_offset = off_1060;
+    break;
   case 0x1100:
     if (kernel_get_fw_version() != 0x11000043U) {
       notify("Only the retail 11.00 build (0x11000043) is supported\n");

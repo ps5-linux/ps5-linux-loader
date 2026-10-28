@@ -18,6 +18,7 @@
 int stage_linux_aliases_1160(const struct linux_info *info, void *bzimage,
                              size_t bzimage_mapping_size, void *initrd,
                              size_t initrd_mapping_size);
+int take_sx_stack_page_10xx(uint64_t copy_lo, uint64_t copy_hi);
 
 /* stage_linux_aliases_1160 returns this instead of -1 when it refused a page
  * table or the code cave inside the copy range. Those stay where they are

