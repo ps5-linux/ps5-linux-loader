@@ -488,7 +488,8 @@ int dump_device_firmwares(const char *boot_file_path) {
   int ret = dump_ps5_wifi_firmware(boot_file_path);
 
   // Only PS5 Pro firmwares have a GPU firmware table offset.
-  if (env_offset.PS5_PRO_GPU_FW_OFFSET != 0 &&
+  if (sceKernelGetMainSocId() == 0x840fd0 &&
+      env_offset.PS5_PRO_GPU_FW_OFFSET != 0 &&
       dump_ps5_pro_gpu_firmware(boot_file_path) < 0)
     ret = -1;
 
