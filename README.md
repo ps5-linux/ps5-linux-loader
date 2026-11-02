@@ -32,6 +32,7 @@ Features:
 - **11.00**, **11.20**, **11.40**, **11.60** with M.2 support
 - **12.00**, **12.02**, **12.20**, **12.40**, **12.60**, **12.70** with M.2 support
 - **13.20**, **13.40**, **13.42**, **13.60** with M.2 support
+- **13.20**, **13.60** with "viola" GPU uCode support
 
 Support for 1.xx and 2.xx firmwares may be added in the future, but we will not prioritize this effort.
 
