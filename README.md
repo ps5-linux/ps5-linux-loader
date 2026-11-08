@@ -256,6 +256,18 @@ Then follow the same instructions again as the previous section.
 
 In order to always boot Linux from your M.2, you can edit the label at `/boot/efi/cmdline.txt` from `root=LABEL=ubuntu2604` to `root=LABEL=ubuntu2604-m2`. You will still require a USB drive with the FAT32, but you can reformat the ext4 partition.
 
+## Bluetooth pairing sync
+
+The loader exports active PS5 OS classic Bluetooth pairings on each boot for
+BlueZ to import before starting Bluetooth. No marker or Linux setup is required
+for export. Install the [Linux importer](https://github.com/ps5-linux/ps5-linux-patches/tree/main/bluetooth)
+and point it at the directory containing the initrd selected by the loader.
+
+The handoff `ps5-bt-sync.json` contains pairing keys and is deleted by the importer.
+Without an importer, it remains on the boot partition.
+Keep devices paired in PS5 OS. The registry layout was tested on firmware 13.60
+with DualSense and DualSense Edge; unsupported LE records are skipped.
+
 ## Fan & boost control
 
 We provide a simple tool that allows you to boost your CPU to 3500Mhz and GPU to 2230MHz as well as changing the fan curve:

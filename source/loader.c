@@ -1,4 +1,5 @@
 #include "loader.h"
+#include "bluetooth.h"
 #include "config.h"
 #include "firmware.h"
 #include "linux.h"
@@ -167,6 +168,9 @@ int fetch_linux(struct linux_info *info) {
     notify(
         "Something went wrong while dumping device firmwares - Continuing\n");
   }
+
+  if (dump_bluetooth_pairings(initrd_path) < 0)
+    notify("Could not export Bluetooth pairings - Continuing\n");
 
   size_t vram_size;
   char buf_vram[16] = {};
