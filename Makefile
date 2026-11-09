@@ -11,7 +11,7 @@ SRC := $(wildcard source/*.c)
 OBJS := $(SRC:.c=.o)
 
 CFLAGS  := -std=c23 -Wall -Iinclude -Ishellcode_hv -Ishellcode_kernel
-LDFLAGS :=
+LDFLAGS := -lSceRegMgr
 
 SC_0607_H := shellcode_0607/shellcode_0607.h
 SC_HV_H := shellcode_hv/shellcode_hv.h
