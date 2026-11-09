@@ -648,6 +648,6 @@ int hv_defeat_1160(void *shellcode_kernel, size_t shellcode_kernel_len) {
    * the #GP/#SX copy-and-transfer chain after NPT has been disabled. */
   kwrite64(kg(env_offset.ACPIGBL_FACS), kg(env_offset.ACPIGBL_FACS) - 8);
 
-  notify("11.60 Linux wake chain armed\n");
+  notify("%04x Linux wake chain armed\n", fw);
   return 0;
 }
