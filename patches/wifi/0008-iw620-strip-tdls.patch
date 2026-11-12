@@ -1,0 +1,41 @@
+From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
+Subject: [PATCH 8/8] iw620: strip TDLS support flags to prevent firmware panic 0x122
+
+PlayStation 5 IW620 firmware rejects TDLS_OPERATION (0x122). When an
+external station issues a TDLS setup request, the unhandled command causes
+firmware disconnect followed by an unrecoverable scan deadlock.
+
+Strip WIPHY_FLAG_SUPPORTS_TDLS and WIPHY_FLAG_TDLS_EXTERNAL_SETUP during
+wiphy registration so wpa_supplicant declines TDLS requests and continues
+communicating reliably through the AP.
+
+Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
+---
+ mlinux/moal_sta_cfg80211.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/mlinux/moal_sta_cfg80211.c b/mlinux/moal_sta_cfg80211.c
+index 2ec7c88..3d24b52 100644
+--- a/mlinux/moal_sta_cfg80211.c
++++ b/mlinux/moal_sta_cfg80211.c
+@@ -12065,13 +12065,11 @@ mlan_status woal_register_cfg80211(moal_private *priv)
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
+ 	wiphy->features |= NL80211_FEATURE_INACTIVITY_TIMER;
+ #endif
+-#if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+-	wiphy->flags |=
+-		WIPHY_FLAG_SUPPORTS_TDLS | WIPHY_FLAG_TDLS_EXTERNAL_SETUP;
+-#endif
+-#if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
+-	wiphy->features |= NL80211_FEATURE_TDLS_CHANNEL_SWITCH;
+-#endif
++	/*
++	 * PS5: no TDLS. The console's IW620 firmware rejects TDLS_OPERATION (0x122); a peer's setup request then
++	 * ends in a disconnect and a scan command that never returns. Without these flags wpa_supplicant declines
++	 * the request and the peer keeps talking through the AP.
++	 */
+ 
+ #ifdef STA_CFG80211
+ #if CFG80211_VERSION_CODE > KERNEL_VERSION(4, 12, 14)
+-- 
+2.43.0

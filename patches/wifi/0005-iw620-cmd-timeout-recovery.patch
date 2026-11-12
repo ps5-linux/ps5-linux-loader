@@ -1,0 +1,190 @@
+From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
+Subject: [PATCH 5/8] iw620: release timed out command and handle soft recovery for benign queries
+
+On a command timeout, the driver left curr_cmd set and cmd_sent MTRUE,
+wedging the command queue permanently so that all subsequent ioctls queued
+indefinitely.
+
+Always release the timed-out command and complete its ioctl. For benign
+query commands (RSSI, log, rate query, RF tx power, SNMP MIB), support
+soft recovery up to 3 times before declaring an unrecoverable adapter hang.
+Ensure num_cmd_timeout is cleared during soft recovery so wlan_process_cmdresp()
+does not drop future valid responses.
+
+Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
+---
+ mlan/mlan_cmdevt.c | 95 +++++++++++++++++++++++++++++++++++++++++++++++++-----
+ mlan/mlan_init.c   |  1 +
+ mlan/mlan_main.h   |  4 +++
+ 3 files changed, 92 insertions(+), 8 deletions(-)
+
+diff --git a/mlan/mlan_cmdevt.c b/mlan/mlan_cmdevt.c
+index f433f88..35a0992 100644
+--- a/mlan/mlan_cmdevt.c
++++ b/mlan/mlan_cmdevt.c
+@@ -2543,6 +2543,9 @@ mlan_status wlan_process_cmdresp(mlan_adapter *pmadapter)
+ 		ret = MLAN_STATUS_FAILURE;
+ 		goto done;
+ 	}
++	/* A response means the firmware is answering again, so the run of
++	 * consecutive benign timeouts is over. */
++	pmadapter->soft_cmd_timeout = 0;
+ 	if (pmadapter->curr_cmd)
+ 		if (pmadapter->curr_cmd->pioctl_buf != MNULL) {
+ 			pioctl_buf = (mlan_ioctl_req *)
+@@ -2838,6 +2841,69 @@ done:
+ 	return ret;
+ }
+ 
++/**
++ *  @brief Is a timeout on this command benign?
++ *
++ *  These are pure queries. The firmware dropping one does not mean the link
++ *  state is wrong, so the driver can carry on rather than declare a hang.
++ *  Anything not listed here is treated as evidence the firmware is gone.
++ *
++ *  @param cmd_id   Host command id that timed out
++ *  @return         MTRUE if benign, MFALSE otherwise
++ */
++static t_u8 wlan_is_benign_cmd_timeout(t_u16 cmd_id)
++{
++	switch (cmd_id) {
++	case HostCmd_CMD_RSSI_INFO:
++	case HostCmd_CMD_802_11_GET_LOG:
++	case HostCmd_CMD_802_11_TX_RATE_QUERY:
++	case HostCmd_CMD_802_11_RF_TX_POWER:
++	case HostCmd_CMD_802_11_SNMP_MIB:
++		return MTRUE;
++	default:
++		return MFALSE;
++	}
++}
++
++/** Consecutive benign command timeouts tolerated before declaring a hang */
++#define IW620_MAX_SOFT_CMD_TIMEOUT 3
++
++/**
++ *  @brief Release a timed-out command and wake anything waiting on its ioctl.
++ *
++ *  MUST run for every command timeout, benign or not. Leaving curr_cmd set and
++ *  cmd_sent MTRUE wedges the command queue permanently: every later ioctl is
++ *  queued behind a command that will never be sent, and MOAL_IOCTL_WAIT has no
++ *  timeout, so callers block forever. When the caller is a cfg80211 op it is
++ *  holding the wiphy mutex under RTNL, which then strands RTNL and freezes
++ *  every network-touching syscall on the machine.
++ *
++ *  wlan_insert_cmd_to_free_q() is what actually completes the ioctl, via
++ *  pcb->moal_ioctl_complete(). Called under cmd lock, matching the driver's
++ *  own "has no cmd resp" path in wlan_dnld_cmd_to_fw().
++ *
++ *  @param pmadapter   A pointer to mlan_adapter structure
++ *  @return            N/A
++ */
++static t_void wlan_release_timeout_cmd(mlan_adapter *pmadapter)
++{
++	cmd_ctrl_node *pcmd_node = MNULL;
++	mlan_ioctl_req *pioctl_buf = MNULL;
++
++	wlan_request_cmd_lock(pmadapter);
++	pcmd_node = pmadapter->curr_cmd;
++	pmadapter->curr_cmd = MNULL;
++	pmadapter->cmd_sent = MFALSE;
++	if (pcmd_node) {
++		if (pcmd_node->pioctl_buf != MNULL) {
++			pioctl_buf = (mlan_ioctl_req *)pcmd_node->pioctl_buf;
++			pioctl_buf->status_code = MLAN_ERROR_CMD_TIMEOUT;
++		}
++		wlan_insert_cmd_to_free_q(pmadapter, pcmd_node);
++	}
++	wlan_release_cmd_lock(pmadapter);
++}
++
+ /**
+  *  @brief This function handles the timeout of command sending.
+  *          It will re-send the same command again.
+@@ -2912,18 +2978,45 @@ t_void wlan_cmd_timeout_func(t_void *function_context)
+ 	wlan_dump_info(pmadapter, REASON_CODE_CMD_TIMEOUT);
+ 
+ 	if (pmadapter->hw_status == WlanHardwareStatusInitializing ||
+-	    pmadapter->hw_status == WlanHardwareStatusGetHwSpec)
++	    pmadapter->hw_status == WlanHardwareStatusGetHwSpec) {
+ 		wlan_init_fw_complete(pmadapter);
+-	else {
+-		/* Signal MOAL to perform extra handling for debugging */
+-		if (pmpriv) {
+-			wlan_recv_event(pmpriv, MLAN_EVENT_ID_DRV_DBG_DUMP,
+-					MNULL);
+-		} else {
+-			wlan_recv_event(wlan_get_priv(pmadapter,
+-						      MLAN_BSS_ROLE_ANY),
+-					MLAN_EVENT_ID_DRV_DBG_DUMP, MNULL);
+-		}
++		goto exit;
++	}
++
++	/* Always release the timed-out command first, whatever it was. Whether
++	 * the firmware is merely flaky or actually gone decides what we do
++	 * next, but it must never decide whether the waiter gets woken. */
++	wlan_release_timeout_cmd(pmadapter);
++
++	if (wlan_is_benign_cmd_timeout(pmadapter->dbg.timeout_cmd_id) &&
++	    pmadapter->soft_cmd_timeout < IW620_MAX_SOFT_CMD_TIMEOUT) {
++		pmadapter->soft_cmd_timeout++;
++		PRINTM(MMSG,
++		       "IW620: soft-recover benign cmd 0x%x timeout (%d/%d)\n",
++		       pmadapter->dbg.timeout_cmd_id,
++		       pmadapter->soft_cmd_timeout, IW620_MAX_SOFT_CMD_TIMEOUT);
++		/* Clearing num_cmd_timeout is mandatory: wlan_process_cmdresp()
++		 * drops every command response while it is non-zero. */
++		pmadapter->num_cmd_timeout = 0;
++		wlan_recv_event(wlan_get_priv(pmadapter, MLAN_BSS_ROLE_ANY),
++				MLAN_EVENT_ID_DRV_DEFER_HANDLING, MNULL);
++		goto exit;
++	}
++
++	PRINTM(MERROR, "IW620: cmd 0x%x timeout is not recoverable (soft %d/%d)\n",
++	       pmadapter->dbg.timeout_cmd_id, pmadapter->soft_cmd_timeout,
++	       IW620_MAX_SOFT_CMD_TIMEOUT);
++	/* num_cmd_timeout is deliberately left set here: the firmware is
++	 * presumed gone, and stale responses should keep being ignored. Later
++	 * ioctls still fail within the command timeout instead of hanging,
++	 * because the queue was released above. */
++
++	/* Signal MOAL to perform extra handling for debugging */
++	if (pmpriv) {
++		wlan_recv_event(pmpriv, MLAN_EVENT_ID_DRV_DBG_DUMP, MNULL);
++	} else {
++		wlan_recv_event(wlan_get_priv(pmadapter, MLAN_BSS_ROLE_ANY),
++				MLAN_EVENT_ID_DRV_DBG_DUMP, MNULL);
+ 	}
+ 
+ exit:
+diff --git a/mlan/mlan_init.c b/mlan/mlan_init.c
+index f63fa62..9ac5ee3 100644
+--- a/mlan/mlan_init.c
++++ b/mlan/mlan_init.c
+@@ -725,6 +725,7 @@ t_void wlan_init_adapter(pmlan_adapter pmadapter)
+ 	pmadapter->data_received = MFALSE;
+ 	pmadapter->seq_num = 0;
+ 	pmadapter->num_cmd_timeout = 0;
++	pmadapter->soft_cmd_timeout = 0;
+ 	pmadapter->last_init_cmd = 0;
+ 	pmadapter->pending_ioctl = MFALSE;
+ 	pmadapter->scan_processing = MFALSE;
+diff --git a/mlan/mlan_main.h b/mlan/mlan_main.h
+index e042f06..9121089 100644
+--- a/mlan/mlan_main.h
++++ b/mlan/mlan_main.h
+@@ -2745,6 +2745,10 @@ struct _mlan_adapter {
+ 	t_void *pmlan_cmd_lock;
+ 	/** Number of command timeouts */
+ 	t_u32 num_cmd_timeout;
++	/** Consecutive benign command timeouts soft-recovered (PS5 IW620).
++	 *  Separate from num_cmd_timeout, which must be cleared after every
++	 *  recovery or wlan_process_cmdresp() drops all further responses. */
++	t_u32 soft_cmd_timeout;
+ 	/** Last init fw command id */
+ 	t_u16 last_init_cmd;
+ 	/** Command timer */
+-- 
+2.43.0

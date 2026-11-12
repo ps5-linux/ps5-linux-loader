@@ -352,3 +352,8 @@ Join our [Discord server](https://discord.gg/CRzZ9N9E6t) to celebrate Linux on P
 - 15432: Tests on BC-250
 - [DeathlySin](https://github.com/DeathlySin): PS5 Pro support (E820 memory map, I/O fix)
 - [gzimbric](https://github.com/gzimbric): 11.60 support, building on the 13.xx work of Ouroboros, DeathlySin and Sonic, with a startup-AP payload based on SpecterDev's Byepervisor
+
+
+## Wi-Fi Support & Hardware Patches
+
+Comprehensive kernel patches and fixes for both MediaTek MT7921 (Slim/CFI-12xx) and NXP IW620 (Fat/CFI-10xx/11xx) are included in [`patches/wifi/`](patches/wifi/). See [`patches/wifi/README.md`](patches/wifi/README.md) for full documentation and installation instructions.
