@@ -1,5 +1,5 @@
 From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 1/8] mt7921e: disable runtime PM and deep sleep on PS5 Salina southbridge
+Subject: [PATCH 1/12] mt7921e: disable runtime PM and deep sleep on PS5 Salina southbridge
 
 Sony Salina southbridge does not implement PCIe ASPM L1.1/L1.2 substate
 handshaking. When MT7921 enters runtime PM or deep sleep, the Salina

@@ -1,0 +1,196 @@
+From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
+Subject: [PATCH 4/12] iw620: PS5 base port and connected scan stability workaround
+
+Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
+---
+diff --git a/Makefile b/Makefile
+index 2f9ff1e..6bf6f79 100644
+--- a/Makefile
++++ b/Makefile
+@@ -35,23 +35,23 @@ CONFIG_SD8897=n
+ CONFIG_USB8897=n
+ CONFIG_PCIE8897=n
+ CONFIG_SD8977=n
+-CONFIG_SD8978=y
++CONFIG_SD8978=n
+ CONFIG_USB8978=n
+-CONFIG_SD8987=y
++CONFIG_SD8987=n
+ CONFIG_SD9097=n
+-CONFIG_SD9177=y
++CONFIG_SD9177=n
+ CONFIG_USB9097=n
+-CONFIG_PCIE9097=n
+-CONFIG_SD9098=y
++CONFIG_PCIE9097=y
++CONFIG_SD9098=n
+ CONFIG_USB9098=n
+-CONFIG_PCIE9098=y
+-CONFIG_SDIW610=y
+-CONFIG_USBIW610=y
++CONFIG_PCIE9098=n
++CONFIG_SDIW610=n
++CONFIG_USBIW610=n
+ CONFIG_SDIW624=n
+ CONFIG_SDAW693=n
+ CONFIG_PCIEIW624=n
+ CONFIG_USBIW624=n
+-CONFIG_PCIEAW693=y
++CONFIG_PCIEAW693=n
+ 
+ 
+ # Debug Option
+@@ -161,7 +161,8 @@ ccflags-y += -DLINUX
+ 
+ 
+ 
+-ARCH ?= arm64
++ARCH ?= x86
++KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+ CONFIG_IMX_SUPPORT=y
+ ifeq ($(CONFIG_IMX_SUPPORT),y)
+ ccflags-y += -DIMX_SUPPORT
+@@ -650,7 +651,7 @@ moal-objs := $(MOALOBJS)
+ else
+ 
+ default:
+-	$(MAKE) -C $(KERNELDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
++	$(MAKE) -C $(KERNELDIR) M=$(CURDIR) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
+ 
+ endif
+ 
+diff --git a/mlan/mlan_init.c b/mlan/mlan_init.c
+index 1d7dec4..f63fa62 100644
+--- a/mlan/mlan_init.c
++++ b/mlan/mlan_init.c
+@@ -778,6 +778,8 @@ t_void wlan_init_adapter(pmlan_adapter pmadapter)
+ 	pmadapter->active_scan_triggered = MFALSE;
+ 	if (!pmadapter->init_para.ext_scan)
+ 		pmadapter->ext_scan = EXT_SCAN_TYPE_ENH;
++	else if (pmadapter->init_para.ext_scan == MLAN_LEGACY_SCAN)
++		pmadapter->ext_scan = MFALSE;
+ 	else if (pmadapter->init_para.ext_scan == EXT_SCAN_TYPE_ENH)
+ 		pmadapter->ext_scan = EXT_SCAN_TYPE_ENH;
+ 	else
+diff --git a/mlinux/moal_eth_ioctl.c b/mlinux/moal_eth_ioctl.c
+index f093c86..e9d1f3c 100644
+--- a/mlinux/moal_eth_ioctl.c
++++ b/mlinux/moal_eth_ioctl.c
+@@ -6967,7 +6967,7 @@ static int woal_priv_get_ap(moal_private *priv, t_u8 *respbuf, t_u32 respbuflen)
+ 		moal_memcpy_ext(priv->phandle, mwr->u.ap_addr.sa_data,
+ 				&bss_info.bssid, MLAN_MAC_ADDR_LENGTH,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 80)
+-				sizeof(mwr->u.ap_addr.sa_data_min));
++				sizeof(mwr->u.ap_addr.sa_data));
+ #else
+ 				sizeof(mwr->u.ap_addr.sa_data));
+ #endif
+diff --git a/mlinux/moal_init.c b/mlinux/moal_init.c
+index 1979042..343535f 100644
+--- a/mlinux/moal_init.c
++++ b/mlinux/moal_init.c
+@@ -3544,7 +3544,7 @@ MODULE_PARM_DESC(
+ module_param(ext_scan, int, 0660);
+ MODULE_PARM_DESC(
+ 	ext_scan,
+-	"0: MLAN default; 1: Enable Extended Scan; 2: Enable Enhanced Extended Scan");
++	"0: MLAN default; 1: Legacy Scan; 2: Enable Extended Scan; 3: Enable Enhanced Extended Scan");
+ module_param(bootup_cal_ctrl, int, 0660);
+ MODULE_PARM_DESC(
+ 	bootup_cal_ctrl,
+diff --git a/mlinux/moal_pcie.c b/mlinux/moal_pcie.c
+index fc1eedb..acd8840 100644
+--- a/mlinux/moal_pcie.c
++++ b/mlinux/moal_pcie.c
+@@ -132,6 +132,7 @@ static const struct pci_device_id wlan_ids[] = {
+ 
+ 	{},
+ };
++MODULE_DEVICE_TABLE(pci, wlan_ids);
+ /* moal interface ops */
+ static moal_if_ops pcie_ops;
+ 
+diff --git a/mlinux/moal_shim.c b/mlinux/moal_shim.c
+index 7aebbdf..181c4f2 100644
+--- a/mlinux/moal_shim.c
++++ b/mlinux/moal_shim.c
+@@ -3784,7 +3784,7 @@ mlan_status moal_recv_event(t_void *pmoal, pmlan_event pmevent)
+ 			moal_memcpy_ext(priv->phandle, wrqu.ap_addr.sa_data,
+ 					pmevent->event_buf, ETH_ALEN,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 80)
+-					sizeof(wrqu.ap_addr.sa_data_min));
++					sizeof(wrqu.ap_addr.sa_data));
+ #else
+ 					sizeof(wrqu.ap_addr.sa_data));
+ #endif
+diff --git a/mlinux/moal_sta_cfg80211.c b/mlinux/moal_sta_cfg80211.c
+index 58d4592..a797af9 100644
+--- a/mlinux/moal_sta_cfg80211.c
++++ b/mlinux/moal_sta_cfg80211.c
+@@ -155,6 +155,10 @@ woal_cfg80211_reg_notifier(struct wiphy *wiphy,
+ 			   struct regulatory_request *request);
+ 
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 6, 0)
++static int ps5_fake_connected_scan = 1;
++module_param(ps5_fake_connected_scan, int, 0644);
++MODULE_PARM_DESC(ps5_fake_connected_scan, "1: Fake-complete scans while connected (default); 0: Pass them to the firmware");
++
+ static int woal_cfg80211_scan(struct wiphy *wiphy,
+ 			      struct cfg80211_scan_request *request);
+ #else
+@@ -5628,6 +5632,20 @@ static int woal_cfg80211_scan(struct wiphy *wiphy, struct net_device *dev,
+ 	}
+ #endif
+ 
++	if (priv->media_connected == MTRUE && ps5_fake_connected_scan) {
++		PRINTM(MMSG,
++		       "Fake-complete connected-state scan on %s for PS5 IW620 stability\n",
++		       dev->name);
++		spin_lock_irqsave(&priv->phandle->scan_req_lock, flags);
++		priv->phandle->fake_scan_complete = MTRUE;
++		priv->phandle->scan_request = request;
++		spin_unlock_irqrestore(&priv->phandle->scan_req_lock, flags);
++		queue_delayed_work(priv->phandle->evt_workqueue,
++				   &priv->phandle->scan_timeout_work,
++				   msecs_to_jiffies(1000));
++		return ret;
++	}
++
+ 	/** Cance remain on channel */
+ 	woal_cancel_remain_on_channel(priv);
+ 
+diff --git a/mlinux/moal_uap_wext.c b/mlinux/moal_uap_wext.c
+index f4b6347..5646778 100644
+--- a/mlinux/moal_uap_wext.c
++++ b/mlinux/moal_uap_wext.c
+@@ -244,7 +244,7 @@ static int woal_get_wap(struct net_device *dev, struct iw_request_info *info,
+ 		moal_memcpy_ext(priv->phandle, awrq->sa_data,
+ 				priv->current_addr, MLAN_MAC_ADDR_LENGTH,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 80)
+-				sizeof(awrq->sa_data_min));
++				sizeof(awrq->sa_data));
+ #else
+ 				sizeof(awrq->sa_data));
+ #endif
+diff --git a/mlinux/moal_wext.c b/mlinux/moal_wext.c
+index 953c60b..694b719 100644
+--- a/mlinux/moal_wext.c
++++ b/mlinux/moal_wext.c
+@@ -590,7 +590,7 @@ static int woal_get_wap(struct net_device *dev, struct iw_request_info *info,
+ 		moal_memcpy_ext(priv->phandle, awrq->sa_data, &bss_info.bssid,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 80)
+ 				MLAN_MAC_ADDR_LENGTH,
+-				sizeof(awrq->sa_data_min));
++				sizeof(awrq->sa_data));
+ #else
+ 				MLAN_MAC_ADDR_LENGTH, sizeof(awrq->sa_data));
+ #endif
+@@ -3073,7 +3073,7 @@ static int woal_get_scan(struct net_device *dev, struct iw_request_info *info,
+ 		moal_memcpy_ext(priv->phandle, iwe.u.ap_addr.sa_data,
+ 				&scan_table[i].mac_address, ETH_ALEN,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 80)
+-				sizeof(iwe.u.ap_addr.sa_data_min));
++				sizeof(iwe.u.ap_addr.sa_data));
+ #else
+ 				sizeof(iwe.u.ap_addr.sa_data));
+ #endif

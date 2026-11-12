@@ -1,0 +1,39 @@
+name: Verify Wi-Fi Driver Patches
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'patches/wifi/**'
+      - '.github/workflows/verify-wifi-patches.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'patches/wifi/**'
+      - '.github/workflows/verify-wifi-patches.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Validate Wi-Fi Driver Patches & Scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Patch Verification Suite
+        run: |
+          cd patches/wifi
+          python3 verify_patches.py
+
+      - name: Run Applicator Dry-Run
+        run: |
+          cd patches/wifi
+          chmod +x apply_patches.sh
+          ./apply_patches.sh --dry-run

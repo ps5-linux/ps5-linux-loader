@@ -1,23 +1,8 @@
 From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 5/8] iw620: release timed out command and handle soft recovery for benign queries
-
-On a command timeout, the driver left curr_cmd set and cmd_sent MTRUE,
-wedging the command queue permanently so that all subsequent ioctls queued
-indefinitely.
-
-Always release the timed-out command and complete its ioctl. For benign
-query commands (RSSI, log, rate query, RF tx power, SNMP MIB), support
-soft recovery up to 3 times before declaring an unrecoverable adapter hang.
-Ensure num_cmd_timeout is cleared during soft recovery so wlan_process_cmdresp()
-does not drop future valid responses.
+Subject: [PATCH 5/12] iw620: release timed out command and handle soft recovery for benign queries
 
 Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
 ---
- mlan/mlan_cmdevt.c | 95 +++++++++++++++++++++++++++++++++++++++++++++++++-----
- mlan/mlan_init.c   |  1 +
- mlan/mlan_main.h   |  4 +++
- 3 files changed, 92 insertions(+), 8 deletions(-)
-
 diff --git a/mlan/mlan_cmdevt.c b/mlan/mlan_cmdevt.c
 index f433f88..35a0992 100644
 --- a/mlan/mlan_cmdevt.c
@@ -186,5 +171,3 @@ index e042f06..9121089 100644
  	/** Last init fw command id */
  	t_u16 last_init_cmd;
  	/** Command timer */
--- 
-2.43.0

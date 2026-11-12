@@ -1,19 +1,8 @@
 From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 4/8] iw620: bound firmware round-trips in dump_station_info to avoid RTNL deadlock
-
-Every firmware round-trip in woal_cfg80211_dump_station_info() runs
-while cfg80211 holds the wiphy mutex and nl80211_pre_doit() holds RTNL.
-MOAL_IOCTL_WAIT has no timeout, so a firmware that stops answering
-strands RTNL and every network-touching syscall blocks in D state.
-
-Replace MOAL_IOCTL_WAIT with MOAL_IOCTL_WAIT_TIMEOUT (20s) for signal,
-stats, bss_info, and dtim_period queries.
+Subject: [PATCH 7/12] iw620: bound firmware round-trips in dump_station_info to avoid RTNL deadlock
 
 Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
 ---
- mlinux/moal_sta_cfg80211.c | 15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
-
 diff --git a/mlinux/moal_sta_cfg80211.c b/mlinux/moal_sta_cfg80211.c
 index 05e820f..0d5942c 100644
 --- a/mlinux/moal_sta_cfg80211.c
@@ -66,5 +55,3 @@ index 05e820f..0d5942c 100644
  	if (ret) {
  		PRINTM(MERROR, "Get DTIM period failed\n");
  		goto done;
--- 
-2.43.0

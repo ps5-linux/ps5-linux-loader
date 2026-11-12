@@ -1,5 +1,5 @@
 From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 8/8] iw620: strip TDLS support flags to prevent firmware panic 0x122
+Subject: [PATCH 12/12] iw620: strip TDLS support flags to prevent firmware panic 0x122
 
 PlayStation 5 IW620 firmware rejects TDLS_OPERATION (0x122). When an
 external station issues a TDLS setup request, the unhandled command causes

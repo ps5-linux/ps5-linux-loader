@@ -1,5 +1,5 @@
 From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 2/8] mt7921e: add Salina PCIe initialization retry quirk and bus hang check
+Subject: [PATCH 2/12] mt7921e: add Salina PCIe initialization retry quirk and u32 bus hang check
 
 On PS5 models with Salina southbridge (CFI-12xx and Slim revisions),
 reference clock stabilization may delay MCU responsiveness during
@@ -7,19 +7,20 @@ cold boot or kexec hand-off, triggering transient "driver own failed"
 (-5 / LPCTL stuck at 0x4) errors.
 
 Introduce bounded retry loop with usleep_range(2000, 5000) for driver
-ownership acquisition. In addition, check for Salina bus hang (register
-read 0xffffffff) to prevent cascading hardware panics.
+ownership acquisition. Use u32 reg_val to check for Salina bus hang
+(register read 0xffffffff) before assigning to u16 chipid to prevent
+integer truncation dead code.
 
 Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
 ---
- drivers/net/wireless/mediatek/mt76/mt7921/pci.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ drivers/net/wireless/mediatek/mt76/mt7921/pci.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
 diff --git a/drivers/net/wireless/mediatek/mt76/mt7921/pci.c b/drivers/net/wireless/mediatek/mt76/mt7921/pci.c
 index 8e45b12..6c19a43 100644
 --- a/drivers/net/wireless/mediatek/mt76/mt7921/pci.c
 +++ b/drivers/net/wireless/mediatek/mt76/mt7921/pci.c
-@@ -404,9 +404,32 @@ static int mt7921_pci_probe(struct pci_dev *pdev,
+@@ -404,9 +404,36 @@ static int mt7921_pci_probe(struct pci_dev *pdev,
  	if (ret)
  		goto err_free_dev;
  
@@ -29,7 +30,10 @@ index 8e45b12..6c19a43 100644
 +	 * readiness during cold boot or kexec. Add bounded retry loop before
 +	 * asserting driver-own failure.
 +	 */
-+	for (int retry = 0; retry < 5; retry++) {
++	u32 reg_val;
++	int retry;
++
++	for (retry = 0; retry < 5; retry++) {
 +		ret = __mt792xe_mcu_drv_pmctrl(dev);
 +		if (!ret)
 +			break;
@@ -38,12 +42,13 @@ index 8e45b12..6c19a43 100644
 +	if (ret)
 +		goto err_free_dev;
 +
-+	chipid = mt7921_l1_rr(dev, MT_HW_CHIPID);
-+	if (chipid == 0xffffffff) {
-+		dev_err(mdev->dev, "Salina PCIe bus hang detected (chipid 0xffffffff)\n");
++	reg_val = mt7921_l1_rr(dev, MT_HW_CHIPID);
++	if (reg_val == 0xffffffff) {
++		dev_err(mdev->dev, "Salina PCIe bus hang detected (CHIPID 0xffffffff)\n");
 +		ret = -ENODEV;
 +		goto err_free_dev;
 +	}
++	chipid = (u16)reg_val;
 +#else
  	ret = __mt792xe_mcu_drv_pmctrl(dev);
  	if (ret)

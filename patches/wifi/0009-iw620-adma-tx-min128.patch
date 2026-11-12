@@ -1,25 +1,12 @@
 From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 6/8] iw620: enforce minimum 128-byte ADMA descriptor TX padding
-
-The IW620 register table specifies a 128-byte TX descriptor minimum.
-Short frames without padding cause ADMA controller desynchronization
-during bursty traffic such as TLS 1.3 handshakes.
-
-Implement wlan_iw620_tx_dma_len() to pad short packets to 128 bytes
-with zero-tailing bounce buffers while preserving real packet lengths
-in the protocol headers.
+Subject: [PATCH 9/12] iw620: enforce minimum 128-byte ADMA descriptor TX padding
 
 Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
 ---
- mlan/mlan_main.h |  2 ++
- mlan/mlan_pcie.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++----------
- 2 files changed, 76 insertions(+), 14 deletions(-)
-
 diff --git a/mlan/mlan_main.h b/mlan/mlan_main.h
-index e042f06..cf398bb 100644
 --- a/mlan/mlan_main.h
 +++ b/mlan/mlan_main.h
-@@ -2389,6 +2389,8 @@ struct _mlan_card_pcie {
+@@ -2389,6 +2389,8 @@
  	t_void *txbd_ring[MLAN_MAX_TXRX_BD];
  	/** A list of mlan_buffer objects used for data tx */
  	mlan_buffer *tx_buf_list[MLAN_MAX_TXRX_BD];
@@ -29,10 +16,9 @@ index e042f06..cf398bb 100644
  	t_bool txbd_flush;
  	/** txrx data dma ring size */
 diff --git a/mlan/mlan_pcie.c b/mlan/mlan_pcie.c
-index b28d317..1f89ca2 100644
 --- a/mlan/mlan_pcie.c
 +++ b/mlan/mlan_pcie.c
-@@ -1152,6 +1152,37 @@ static mlan_status wlan_pcie_alloc_txbd_ring(mlan_adapter *pmadapter)
+@@ -1152,6 +1152,37 @@
  	return ret;
  }
  
@@ -70,7 +56,7 @@ index b28d317..1f89ca2 100644
  /**
   *  @brief This function creates buffer descriptor ring for TX
   *
-@@ -1222,6 +1253,7 @@ static mlan_status wlan_pcie_alloc_tx_buffers(mlan_adapter *pmadapter)
+@@ -1222,6 +1253,7 @@
  
  	for (i = 0; i < pmadapter->pcard_pcie->txrx_bd_size; i++) {
  		pmadapter->pcard_pcie->tx_buf_list[i] = MNULL;
@@ -78,7 +64,7 @@ index b28d317..1f89ca2 100644
  #if defined(PCIE9098) || defined(PCIE9097) || defined(PCIEAW693) ||            \
  	defined(PCIEIW624)
  		if (pmadapter->pcard_pcie->reg->use_adma) {
-@@ -1328,11 +1360,9 @@ static mlan_status wlan_pcie_delete_tx_ring(mlan_adapter *pmadapter)
+@@ -1328,11 +1360,9 @@
  		if (pmadapter->pcard_pcie->tx_buf_list[i]) {
  			pmbuf = pmadapter->pcard_pcie->tx_buf_list[i];
  			if (!wlan_copy_on_tx_enabled(pmadapter)) {
@@ -93,7 +79,7 @@ index b28d317..1f89ca2 100644
  			}
  			wlan_write_data_complete(pmadapter, pmbuf,
  						 MLAN_STATUS_FAILURE);
-@@ -2175,11 +2205,8 @@ mlan_status wlan_clean_txbd(mlan_adapter *pmadapter, t_u8 *pdone)
+@@ -2175,11 +2205,8 @@
  			       pmadapter->pcard_pcie->txbd_rdptr);
  
  			if (unmap_on_tx) {
@@ -107,7 +93,7 @@ index b28d317..1f89ca2 100644
  				if (ret == MLAN_STATUS_FAILURE) {
  					PRINTM(MERROR,
  					       "%s: moal_unmap_memory failed\n",
-@@ -2610,6 +2637,8 @@ mlan_status wlan_send_single_packet(mlan_adapter *pmadapter,
+@@ -2610,6 +2637,8 @@
  	t_u8 *payload;
  	t_u32 wr_ptr_start = 0;
  	const t_bool copy_on_tx = wlan_copy_on_tx_enabled(pmadapter);
@@ -116,7 +102,7 @@ index b28d317..1f89ca2 100644
  
  	ENTER();
  
-@@ -2648,6 +2677,7 @@ mlan_status wlan_send_single_packet(mlan_adapter *pmadapter,
+@@ -2648,6 +2677,7 @@
  				    wlan_cpu_to_le16((t_u16)pmbuf->data_len));
  		write_u16_unaligned(pmadapter, &payload[2],
  				    wlan_cpu_to_le16(type));
@@ -124,7 +110,7 @@ index b28d317..1f89ca2 100644
  
  		if (copy_on_tx) {
  			mlan_buffer *staged_buf;
-@@ -2660,22 +2690,41 @@ mlan_status wlan_send_single_packet(mlan_adapter *pmadapter,
+@@ -2660,22 +2690,41 @@
  			memcpy_ext(pmadapter, staged_buf->pbuf,
  				   pmbuf->pbuf + pmbuf->data_offset,
  				   pmbuf->data_len, MLAN_TX_DATA_BUF_SIZE_4K);
@@ -169,7 +155,7 @@ index b28d317..1f89ca2 100644
  				ret = MLAN_STATUS_FAILURE;
  				goto done;
  			}
-@@ -2690,6 +2739,9 @@ mlan_status wlan_send_single_packet(mlan_adapter *pmadapter,
+@@ -2690,6 +2739,9 @@
  				    pmadapter->pmlan_pcie_lock);
  
  		pmadapter->pcard_pcie->tx_buf_list[wrindx] = pmbuf;
@@ -179,7 +165,7 @@ index b28d317..1f89ca2 100644
  #if defined(PCIE8897)
  		if (!pmadapter->pcard_pcie->reg->use_adma) {
  			wr_ptr_start = TXBD_RW_PTR_START;
-@@ -2737,7 +2789,7 @@ mlan_status wlan_send_single_packet(mlan_adapter *pmadapter,
+@@ -2737,7 +2789,7 @@
  					wlan_cpu_to_le64(pmbuf->buf_pa);
  			}
  
@@ -188,7 +174,7 @@ index b28d317..1f89ca2 100644
  
  #if defined(PCIEAW693)
  			if (IS_PCIEAW693(pmadapter->card_type)) {
-@@ -2771,6 +2823,14 @@ mlan_status wlan_send_single_packet(mlan_adapter *pmadapter,
+@@ -2771,6 +2823,14 @@
  			pmadapter->pmoal_handle, reg_txbd_wrptr,
  			(pmadapter->pcard_pcie->txbd_wrptr << wr_ptr_start) |
  				rxbd_val);
@@ -203,7 +189,7 @@ index b28d317..1f89ca2 100644
  
  		pcb->moal_spin_unlock(pmadapter->pmoal_handle,
  				      pmadapter->pmlan_pcie_lock);
-@@ -2831,20 +2891,10 @@ done:
+@@ -2831,20 +2891,10 @@
  done_unmap:
  	if (!copy_on_tx &&
  	    MLAN_STATUS_FAILURE ==
@@ -225,5 +211,3 @@ index b28d317..1f89ca2 100644
  
  #if defined(PCIE8897)
  	if (!pmadapter->pcard_pcie->reg->use_adma && ptx_bd_buf) {
--- 
-2.43.0
