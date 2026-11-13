@@ -1,8 +1,3 @@
-From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 4/12] iw620: PS5 base port and connected scan stability workaround
-
-Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
----
 diff --git a/Makefile b/Makefile
 index 2f9ff1e..6bf6f79 100644
 --- a/Makefile

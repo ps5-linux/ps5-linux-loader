@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PlayStation 5 Wi-Fi Driver Patch Verification Suite (v2)
+PlayStation 5 Wi-Fi Driver Patch Verification Suite (v4)
 Performs deep static analysis and applicability checks:
 1. Strict C comment compliance (prohibits C++ '//' comments in C/kernel patches).
 2. Truncation anti-pattern detection (catches u16 truncation before 0xffffffff comparison).
@@ -19,14 +19,15 @@ PATCH_FILES = [
     "0002-mt7921e-pcie-reset-quirk.patch",
     "0003-ps5-defconfig-enable-mt7921e.patch",
     "0004-iw620-base-port.patch",
-    "0005-iw620-cmd-timeout-recovery.patch",
-    "0006-iw620-kernel-compat.patch",
-    "0007-iw620-rtnl-bounded-wait.patch",
-    "0008-iw620-he-ppe-fix.patch",
-    "0009-iw620-adma-tx-min128.patch",
-    "0010-iw620-tx-priority-wmm.patch",
-    "0011-iw620-kexec-scratch-flr.patch",
-    "0012-iw620-strip-tdls.patch"
+    "0005-iw620-cmd-timeout-recover.patch",
+    "0006-iw620-kernel71-compat.patch",
+    "0007-iw620-kernel72-compat.patch",
+    "0008-iw620-kernel73-compat.patch",
+    "0009-iw620-rtnl-bounded-wait.patch",
+    "0010-iw620-he.patch",
+    "0011-iw620-tx-min128.patch",
+    "0012-iw620-tx-priority.patch",
+    "0013-iw620-fresh-fw.patch"
 ]
 
 def verify_hunk_math(lines, filename):
@@ -125,7 +126,7 @@ def check_patch(filename):
     return (len(errors) == 0), errors
 
 def main():
-    print(f"=== PS5 Wi-Fi Patch Verification Suite (v2) ===")
+    print(f"=== PS5 Wi-Fi Patch Verification Suite (v4) ===")
     print(f"Target directory: {PATCH_DIR}")
     total_errors = 0
     passed_count = 0
@@ -145,7 +146,7 @@ def main():
     print(f"Total: {len(PATCH_FILES)} patches | Passed: {passed_count} | Errors: {total_errors}")
 
     if total_errors == 0:
-        print("[SUCCESS] All 12 patches passed deep static and git validation cleanly.")
+        print("[SUCCESS] All 13 patches passed deep static and git validation cleanly.")
         return 0
     else:
         print(f"[FAILURE] Validation failed with {total_errors} errors.")

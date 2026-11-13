@@ -1,8 +1,3 @@
-From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 8/12] iw620: correct 5GHz HE PPE profile and request TX BA timeout zero
-
-Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
----
 diff --git a/mlan/mlan_11ax.c b/mlan/mlan_11ax.c
 --- a/mlan/mlan_11ax.c
 +++ b/mlan/mlan_11ax.c

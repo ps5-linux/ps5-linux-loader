@@ -1,8 +1,3 @@
-From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 7/12] iw620: bound firmware round-trips in dump_station_info to avoid RTNL deadlock
-
-Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
----
 diff --git a/mlinux/moal_sta_cfg80211.c b/mlinux/moal_sta_cfg80211.c
 index 05e820f..0d5942c 100644
 --- a/mlinux/moal_sta_cfg80211.c

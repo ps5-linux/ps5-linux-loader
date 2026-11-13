@@ -1,8 +1,3 @@
-From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 5/12] iw620: release timed out command and handle soft recovery for benign queries
-
-Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
----
 diff --git a/mlan/mlan_cmdevt.c b/mlan/mlan_cmdevt.c
 index f433f88..35a0992 100644
 --- a/mlan/mlan_cmdevt.c

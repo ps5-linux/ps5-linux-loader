@@ -1,0 +1,291 @@
+diff --git a/mlinux/moal_cfg80211.c b/mlinux/moal_cfg80211.c
+index 207e671..d1308b8 100644
+--- a/mlinux/moal_cfg80211.c
++++ b/mlinux/moal_cfg80211.c
+@@ -1806,7 +1806,7 @@ fail:
+  * @return              0 -- success, otherwise fail
+  */
+ #endif
+-int woal_cfg80211_add_key(struct wiphy *wiphy, struct net_device *netdev,
++int woal_cfg80211_add_key(struct wiphy *wiphy, struct wireless_dev *wdev,
+ #if ((KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE) ||                        \
+      (defined(ANDROID_SDK_VERSION) && ANDROID_SDK_VERSION >= 33))
+ 			  int link_id,
+@@ -1817,6 +1817,7 @@ int woal_cfg80211_add_key(struct wiphy *wiphy, struct net_device *netdev,
+ #endif
+ 			  const t_u8 *mac_addr, struct key_params *params)
+ {
++	struct net_device *netdev = wdev->netdev;
+ 	moal_private *priv = (moal_private *)woal_get_netdev_priv(netdev);
+ 	t_u8 pairwise_key = MFALSE;
+ 
+@@ -1883,7 +1884,7 @@ int woal_cfg80211_add_key(struct wiphy *wiphy, struct net_device *netdev,
+  * @return              0 -- success, otherwise fail
+  */
+ #endif
+-int woal_cfg80211_del_key(struct wiphy *wiphy, struct net_device *netdev,
++int woal_cfg80211_del_key(struct wiphy *wiphy, struct wireless_dev *wdev,
+ #if ((KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE) ||                        \
+      (defined(ANDROID_SDK_VERSION) && ANDROID_SDK_VERSION >= 33))
+ 			  int link_id,
+@@ -1894,6 +1895,7 @@ int woal_cfg80211_del_key(struct wiphy *wiphy, struct net_device *netdev,
+ #endif
+ 			  const t_u8 *mac_addr)
+ {
++	struct net_device *netdev = wdev->netdev;
+ 	moal_private *priv = (moal_private *)woal_get_netdev_priv(netdev);
+ 
+ 	ENTER();
+@@ -1979,7 +1981,7 @@ int woal_cfg80211_set_default_key(struct wiphy *wiphy,
+ 
+ #if KERNEL_VERSION(2, 6, 30) <= CFG80211_VERSION_CODE
+ int woal_cfg80211_set_default_mgmt_key(struct wiphy *wiphy,
+-				       struct net_device *netdev,
++				       struct wireless_dev *wdev,
+ #if ((KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE) ||                        \
+      (defined(ANDROID_SDK_VERSION) && ANDROID_SDK_VERSION >= 33))
+ 				       int link_id,
+@@ -1994,7 +1996,7 @@ int woal_cfg80211_set_default_mgmt_key(struct wiphy *wiphy,
+ 
+ #if KERNEL_VERSION(5, 10, 0) <= CFG80211_VERSION_CODE
+ int woal_cfg80211_set_default_beacon_key(struct wiphy *wiphy,
+-					 struct net_device *netdev,
++					 struct wireless_dev *wdev,
+ #if ((KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE) ||                        \
+      (defined(ANDROID_SDK_VERSION) && ANDROID_SDK_VERSION >= 33))
+ 					 int link_id,
+diff --git a/mlinux/moal_cfg80211.h b/mlinux/moal_cfg80211.h
+index 7e98c49..a8a64c5 100644
+--- a/mlinux/moal_cfg80211.h
++++ b/mlinux/moal_cfg80211.h
+@@ -152,7 +152,7 @@ int woal_cfg80211_set_wiphy_params(struct wiphy *wiphy,
+ #endif
+ 				   u32 changed);
+ 
+-int woal_cfg80211_add_key(struct wiphy *wiphy, struct net_device *dev,
++int woal_cfg80211_add_key(struct wiphy *wiphy, struct wireless_dev *wdev,
+ #if ((KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE) ||                        \
+      (defined(ANDROID_SDK_VERSION) && ANDROID_SDK_VERSION >= 33))
+ 			  int link_id,
+@@ -163,7 +163,7 @@ int woal_cfg80211_add_key(struct wiphy *wiphy, struct net_device *dev,
+ #endif
+ 			  const t_u8 *mac_addr, struct key_params *params);
+ 
+-int woal_cfg80211_del_key(struct wiphy *wiphy, struct net_device *dev,
++int woal_cfg80211_del_key(struct wiphy *wiphy, struct wireless_dev *wdev,
+ #if ((KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE) ||                        \
+      (defined(ANDROID_SDK_VERSION) && ANDROID_SDK_VERSION >= 33))
+ 			  int link_id,
+@@ -263,7 +263,7 @@ int woal_cfg80211_set_default_key(struct wiphy *wiphy, struct net_device *dev,
+ 
+ #if KERNEL_VERSION(2, 6, 30) <= CFG80211_VERSION_CODE
+ int woal_cfg80211_set_default_mgmt_key(struct wiphy *wiphy,
+-				       struct net_device *netdev,
++				       struct wireless_dev *wdev,
+ #if ((KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE) ||                        \
+      (defined(ANDROID_SDK_VERSION) && ANDROID_SDK_VERSION >= 33))
+ 				       int link_id,
+@@ -273,7 +273,7 @@ int woal_cfg80211_set_default_mgmt_key(struct wiphy *wiphy,
+ 
+ #if KERNEL_VERSION(5, 10, 0) <= CFG80211_VERSION_CODE
+ int woal_cfg80211_set_default_beacon_key(struct wiphy *wiphy,
+-					 struct net_device *netdev,
++					 struct wireless_dev *wdev,
+ #if ((KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE) ||                        \
+      (defined(ANDROID_SDK_VERSION) && ANDROID_SDK_VERSION >= 33))
+ 					 int link_id,
+@@ -503,7 +503,7 @@ int woal_cfg80211_del_beacon(struct wiphy *wiphy, struct net_device *dev,
+ #else
+ int woal_cfg80211_del_beacon(struct wiphy *wiphy, struct net_device *dev);
+ #endif
+-int woal_cfg80211_del_station(struct wiphy *wiphy, struct net_device *dev,
++int woal_cfg80211_del_station(struct wiphy *wiphy, struct wireless_dev *wdev,
+ #if KERNEL_VERSION(3, 19, 0) <= CFG80211_VERSION_CODE
+ 			      struct station_del_parameters *param);
+ #else
+diff --git a/mlinux/moal_shim.c b/mlinux/moal_shim.c
+index 7aebbdf..7ae4af8 100644
+--- a/mlinux/moal_shim.c
++++ b/mlinux/moal_shim.c
+@@ -5038,7 +5038,7 @@ mlan_status moal_recv_event(t_void *pmoal, pmlan_event pmevent)
+ 				}
+ #endif /* KERNEL_VERSION */
+ 				if (priv->netdev && priv->wdev)
+-					cfg80211_new_sta(priv->netdev,
++					cfg80211_new_sta(priv->wdev,
+ 							 (t_u8 *)addr, sinfo,
+ 							 GFP_KERNEL);
+ 				kfree(sinfo);
+@@ -5101,7 +5101,7 @@ mlan_status moal_recv_event(t_void *pmoal, pmlan_event pmevent)
+ 			} else
+ #endif
+ 				if (priv->netdev && priv->wdev)
+-				cfg80211_del_sta(priv->netdev,
++				cfg80211_del_sta(priv->wdev,
+ 						 pmevent->event_buf + 2,
+ 						 GFP_KERNEL);
+ 
+diff --git a/mlinux/moal_sta_cfg80211.c b/mlinux/moal_sta_cfg80211.c
+index 58d4592..05e820f 100644
+--- a/mlinux/moal_sta_cfg80211.c
++++ b/mlinux/moal_sta_cfg80211.c
+@@ -176,7 +176,7 @@ static int woal_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
+ 				    t_u16 reason_code);
+ 
+ static int woal_cfg80211_get_station(struct wiphy *wiphy,
+-				     struct net_device *dev,
++				     struct wireless_dev *wdev,
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
+ 				     const u8 *mac,
+ #else
+@@ -185,7 +185,7 @@ static int woal_cfg80211_get_station(struct wiphy *wiphy,
+ 				     struct station_info *sinfo);
+ 
+ static int woal_cfg80211_dump_station(struct wiphy *wiphy,
+-				      struct net_device *dev, int idx,
++				      struct wireless_dev *wdev, int idx,
+ 				      t_u8 *mac, struct station_info *sinfo);
+ 
+ static int woal_cfg80211_dump_survey(struct wiphy *wiphy,
+@@ -335,7 +335,7 @@ void woal_cfg80211_tdls_cancel_channel_switch(struct wiphy *wiphy,
+ #endif
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ static int woal_cfg80211_change_station(struct wiphy *wiphy,
+-					struct net_device *dev,
++					struct wireless_dev *wdev,
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
+ 					const u8 *mac,
+ #else
+@@ -372,7 +372,7 @@ int woal_cfg80211_uap_add_station(struct wiphy *wiphy, struct net_device *dev,
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ #ifdef UAP_SUPPORT
+ static int woal_cfg80211_add_station(struct wiphy *wiphy,
+-				     struct net_device *dev,
++				     struct wireless_dev *wdev,
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
+ 				     const u8 *mac,
+ #else
+@@ -6913,7 +6927,7 @@ static int woal_cfg80211_disassociate(struct wiphy *wiphy,
+  * @return                0 -- success, otherwise fail
+  */
+ static int woal_cfg80211_get_station(struct wiphy *wiphy,
+-				     struct net_device *dev,
++				     struct wireless_dev *wdev,
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
+ 				     const u8 *mac,
+ #else
+@@ -6921,6 +6935,7 @@ static int woal_cfg80211_get_station(struct wiphy *wiphy,
+ #endif
+ 				     struct station_info *sinfo)
+ {
++	struct net_device *dev = wdev->netdev;
+ 	mlan_status ret = MLAN_STATUS_SUCCESS;
+ 	moal_private *priv = (moal_private *)woal_get_netdev_priv(dev);
+ 
+@@ -6962,9 +6977,10 @@ static int woal_cfg80211_get_station(struct wiphy *wiphy,
+  * @return                0 -- success, otherwise fail
+  */
+ static int woal_cfg80211_dump_station(struct wiphy *wiphy,
+-				      struct net_device *dev, int idx,
++				      struct wireless_dev *wdev, int idx,
+ 				      t_u8 *mac, struct station_info *sinfo)
+ {
++	struct net_device *dev = wdev->netdev;
+ 	mlan_status ret = MLAN_STATUS_SUCCESS;
+ 	moal_private *priv = (moal_private *)woal_get_netdev_priv(dev);
+ 
+@@ -9312,16 +9328,15 @@ static int woal_construct_tdls_action_frame(moal_private *priv,
+ 			LEAVE();
+ 			return -EFAULT;
+ 		}
+-		skb_put(skb, 1 + sizeof(mgmt->u.action.u.tdls_discover_resp));
++		skb_put(skb, sizeof(mgmt->u.action.action_code) + sizeof(mgmt->u.action.tdls_discover_resp));
+ 		mgmt->u.action.category = WLAN_CATEGORY_PUBLIC;
+-		mgmt->u.action.u.tdls_discover_resp.action_code =
+-			WLAN_PUB_ACTION_TDLS_DISCOVER_RES;
+-		mgmt->u.action.u.tdls_discover_resp.dialog_token = dialog_token;
+-		mgmt->u.action.u.tdls_discover_resp.capability =
++		mgmt->u.action.action_code = WLAN_PUB_ACTION_TDLS_DISCOVER_RES;
++		mgmt->u.action.tdls_discover_resp.dialog_token = dialog_token;
++		mgmt->u.action.tdls_discover_resp.capability =
+ 			cpu_to_le16(capability);
+ 		/* move back for addr4 */
+ 		memmove(pos + ETH_ALEN, &mgmt->u.action,
+-			1 + sizeof(mgmt->u.action.u.tdls_discover_resp));
++			sizeof(mgmt->u.action.action_code) + sizeof(mgmt->u.action.tdls_discover_resp));
+ 		/** init address 4 */
+ 		moal_memcpy_ext(priv->phandle, pos, addr, ETH_ALEN, ETH_ALEN);
+ 
+@@ -10072,7 +10087,7 @@ done:
+  * @return                      0 -- success, otherwise fail
+  */
+ static int woal_cfg80211_change_station(struct wiphy *wiphy,
+-					struct net_device *dev,
++					struct wireless_dev *wdev,
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
+ 					const u8 *mac,
+ #else
+@@ -10080,6 +10095,7 @@ static int woal_cfg80211_change_station(struct wiphy *wiphy,
+ #endif
+ 					struct station_parameters *params)
+ {
++	struct net_device *dev = wdev->netdev;
+ 	int ret = 0;
+ #ifdef UAP_SUPPORT
+ 	moal_private *priv = (moal_private *)woal_get_netdev_priv(dev);
+@@ -10136,7 +10152,7 @@ static int woal_cfg80211_change_station(struct wiphy *wiphy,
+  * @return                  	0 -- success, otherwise fail
+  */
+ static int woal_cfg80211_add_station(struct wiphy *wiphy,
+-				     struct net_device *dev,
++				     struct wireless_dev *wdev,
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
+ 				     const u8 *mac,
+ #else
+@@ -10144,6 +10160,7 @@ static int woal_cfg80211_add_station(struct wiphy *wiphy,
+ #endif
+ 				     struct station_parameters *params)
+ {
++	struct net_device *dev = wdev->netdev;
+ 	moal_private *priv = (moal_private *)woal_get_netdev_priv(dev);
+ 	int ret = 0;
+ 	station_node *sta_node = NULL;
+@@ -11155,7 +11172,7 @@ int woal_cfg80211_uap_add_station(struct wiphy *wiphy, struct net_device *dev,
+ 		struct station_info *sinfo = NULL;
+ 		sinfo = kzalloc(sizeof(struct station_info), GFP_KERNEL);
+ 		if (sinfo) {
+-			cfg80211_new_sta(dev, mac, sinfo, GFP_KERNEL);
++			cfg80211_new_sta(dev->ieee80211_ptr, mac, sinfo, GFP_KERNEL);
+ 			kfree(sinfo);
+ 		}
+ 	}
+diff --git a/mlinux/moal_uap_cfg80211.c b/mlinux/moal_uap_cfg80211.c
+index 1c31a2a..b69cce6 100644
+--- a/mlinux/moal_uap_cfg80211.c
++++ b/mlinux/moal_uap_cfg80211.c
+@@ -583,7 +583,7 @@ static int woal_deauth_assoc_station(moal_private *priv, const u8 *mac_addr,
+ 	}
+ #if KERNEL_VERSION(3, 8, 0) <= CFG80211_VERSION_CODE
+ 	if (moal_extflg_isset(priv->phandle, EXT_HOST_MLME))
+-		cfg80211_del_sta(priv->netdev, mac_addr, GFP_KERNEL);
++		cfg80211_del_sta(priv->wdev, mac_addr, GFP_KERNEL);
+ #endif
+ 	if (priv->media_connected == MFALSE) {
+ 		PRINTM(MINFO, "cfg80211: Media not connected!\n");
+@@ -4234,7 +4234,7 @@ done:
+  * @return                0 -- success, otherwise fail
+  */
+ #endif
+-int woal_cfg80211_del_station(struct wiphy *wiphy, struct net_device *dev,
++int woal_cfg80211_del_station(struct wiphy *wiphy, struct wireless_dev *wdev,
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
+ 			      struct station_del_parameters *param)
+ #else
+@@ -4245,6 +4245,7 @@ int woal_cfg80211_del_station(struct wiphy *wiphy, struct net_device *dev,
+ #endif
+ #endif
+ {
++	struct net_device *dev = wdev->netdev;
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
+ 	const u8 *mac_addr = NULL;
+ #endif

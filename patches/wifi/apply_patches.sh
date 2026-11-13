@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# PlayStation 5 Wi-Fi Driver Patch Applicator (v3)
-# Applies in-tree MT7921e patches (0001-0003) and out-of-tree IW620 patches (0004-0012)
+# PlayStation 5 Wi-Fi Driver Patch Applicator (v4)
+# Applies in-tree MT7921e patches (0001-0003) and out-of-tree IW620 patches (0004-0013)
+# Supports dual-mode target kernel selection (Kernel 6.x vs Kernel 7.x)
 # ==============================================================================
 set -euo pipefail
 
@@ -9,6 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DRY_RUN=0
 KERNEL_DIR=""
 MWIFIEX_DIR=""
+TARGET_KERNEL="7"
 TEMP_KERNEL_DIR=""
 TEMP_MWIFIEX_DIR=""
 
@@ -25,10 +27,11 @@ trap cleanup EXIT INT TERM
 usage() {
     echo "Usage: $0 [options]"
     echo "Options:"
-    echo "  --kernel-dir <dir>   Path to Linux kernel tree"
-    echo "  --mwifiex-dir <dir>  Path to ps5-linux-mwifiex source tree"
-    echo "  --dry-run            Perform true sequential dry-run in isolated temporary workspace"
-    echo "  -h, --help           Show this help message"
+    echo "  --kernel-dir <dir>       Path to Linux kernel tree"
+    echo "  --mwifiex-dir <dir>      Path to ps5-linux-mwifiex source tree"
+    echo "  --target-kernel <6|7>    Target kernel generation (default: 7)"
+    echo "  --dry-run                Perform true sequential dry-run in isolated temporary workspace"
+    echo "  -h, --help               Show this help message"
     exit 1
 }
 
@@ -40,6 +43,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --mwifiex-dir)
             MWIFIEX_DIR="$2"
+            shift 2
+            ;;
+        --target-kernel)
+            TARGET_KERNEL="$2"
             shift 2
             ;;
         --dry-run)
@@ -61,8 +68,9 @@ if [[ -z "${KERNEL_DIR}" && -z "${MWIFIEX_DIR}" ]]; then
     usage
 fi
 
-echo "=== PlayStation 5 Wi-Fi Driver Patch Applicator (v3) ==="
+echo "=== PlayStation 5 Wi-Fi Driver Patch Applicator (v4) ==="
 echo "Suite directory: ${SCRIPT_DIR}"
+echo "Target kernel generation: ${TARGET_KERNEL}"
 
 KERNEL_PATCHES=(
     "0001-mt7921e-disable-runtime-pm-ps5.patch"
@@ -70,17 +78,32 @@ KERNEL_PATCHES=(
     "0003-ps5-defconfig-enable-mt7921e.patch"
 )
 
-MWIFIEX_PATCHES=(
-    "0004-iw620-base-port.patch"
-    "0005-iw620-cmd-timeout-recovery.patch"
-    "0006-iw620-kernel-compat.patch"
-    "0007-iw620-rtnl-bounded-wait.patch"
-    "0008-iw620-he-ppe-fix.patch"
-    "0009-iw620-adma-tx-min128.patch"
-    "0010-iw620-tx-priority-wmm.patch"
-    "0011-iw620-kexec-scratch-flr.patch"
-    "0012-iw620-strip-tdls.patch"
-)
+if [[ "${TARGET_KERNEL}" =~ ^6 ]]; then
+    echo "Configuring IW620 patch chain for Kernel 6.x (skipping 7.x shims)..."
+    MWIFIEX_PATCHES=(
+        "0004-iw620-base-port.patch"
+        "0005-iw620-cmd-timeout-recover.patch"
+        "0009-iw620-rtnl-bounded-wait.patch"
+        "0010-iw620-he.patch"
+        "0011-iw620-tx-min128.patch"
+        "0012-iw620-tx-priority.patch"
+        "0013-iw620-fresh-fw.patch"
+    )
+else
+    echo "Configuring IW620 patch chain for Kernel 7.x (full 10-patch upstream suite)..."
+    MWIFIEX_PATCHES=(
+        "0004-iw620-base-port.patch"
+        "0005-iw620-cmd-timeout-recover.patch"
+        "0006-iw620-kernel71-compat.patch"
+        "0007-iw620-kernel72-compat.patch"
+        "0008-iw620-kernel73-compat.patch"
+        "0009-iw620-rtnl-bounded-wait.patch"
+        "0010-iw620-he.patch"
+        "0011-iw620-tx-min128.patch"
+        "0012-iw620-tx-priority.patch"
+        "0013-iw620-fresh-fw.patch"
+    )
+fi
 
 apply_sequential_chain() {
     local base_dir="$1"
@@ -104,6 +127,21 @@ apply_sequential_chain() {
         fi
 
         echo "    Applying ${patch_name}..."
+
+        # Idempotent defconfig check for MT7921E
+        if [[ "${patch_name}" == "0003-ps5-defconfig-enable-mt7921e.patch" ]]; then
+            local cfg_file=""
+            if [[ -f "${work_dir}/arch/x86/configs/ps5_defconfig" ]]; then
+                cfg_file="${work_dir}/arch/x86/configs/ps5_defconfig"
+            elif [[ -f "${work_dir}/.config" ]]; then
+                cfg_file="${work_dir}/.config"
+            fi
+            if [[ -n "${cfg_file}" ]] && grep -q "^CONFIG_MT7921E=m" "${cfg_file}"; then
+                echo "    [INFO] Already enabled: ${patch_name} (CONFIG_MT7921E=m present in ${cfg_file##*/})"
+                continue
+            fi
+        fi
+
         if git -C "${work_dir}" apply --ignore-whitespace --whitespace=nowarn "${patch_file}"; then
             echo "    [PASS] Applied: ${patch_name}"
         elif git -C "${work_dir}" apply -R --check --ignore-whitespace "${patch_file}" >/dev/null 2>&1; then
@@ -136,7 +174,7 @@ if [[ -n "${MWIFIEX_DIR}" ]]; then
         echo "ERROR: MWIFIEX directory does not exist: ${MWIFIEX_DIR}" >&2
         exit 1
     fi
-    echo "--- [Out-of-Tree IW620] Patch Sequence (0004 - 0012) ---"
+    echo "--- [Out-of-Tree IW620] Patch Sequence (Target Kernel ${TARGET_KERNEL}) ---"
     apply_sequential_chain "${MWIFIEX_DIR}" "${MWIFIEX_PATCHES[@]}"
 fi
 

@@ -1,8 +1,3 @@
-From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 11/12] iw620: check BAR2 scratch 0x1C6C and perform FLR on kexec warm reboot
-
-Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
----
 diff --git a/mlinux/moal_pcie.c b/mlinux/moal_pcie.c
 index acd8840..8b91b16 100644
 --- a/mlinux/moal_pcie.c

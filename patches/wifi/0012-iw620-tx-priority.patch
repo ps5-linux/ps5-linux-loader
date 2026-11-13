@@ -1,8 +1,3 @@
-From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 10/12] iw620: remap STA TX TIDs to prevent queue starvation
-
-Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
----
 diff --git a/mlinux/moal_main.c b/mlinux/moal_main.c
 --- a/mlinux/moal_main.c
 +++ b/mlinux/moal_main.c

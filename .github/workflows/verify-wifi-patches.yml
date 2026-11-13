@@ -15,7 +15,7 @@ on:
 
 jobs:
   verify:
-    name: Deep Patch Verification & Sequential Dry-Run
+    name: Deep Patch Verification & Empirical Dual-Kernel Dry-Run
     runs-on: ubuntu-latest
 
     steps:
@@ -36,9 +36,9 @@ jobs:
         run: |
           mkdir -p /tmp/kernel-tree/drivers/net/wireless/mediatek/mt76/mt7921
           mkdir -p /tmp/kernel-tree/arch/x86/configs
-          curl -fsSL https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/plain/drivers/net/wireless/mediatek/mt76/mt7921/init.c -o /tmp/kernel-tree/drivers/net/wireless/mediatek/mt76/mt7921/init.c
-          curl -fsSL https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/plain/drivers/net/wireless/mediatek/mt76/mt7921/pci.c -o /tmp/kernel-tree/drivers/net/wireless/mediatek/mt76/mt7921/pci.c
-          cp patches/wifi/.config /tmp/kernel-tree/arch/x86/configs/ps5_defconfig 2>/dev/null || touch /tmp/kernel-tree/arch/x86/configs/ps5_defconfig
+          curl -fsSL https://raw.githubusercontent.com/torvalds/linux/master/drivers/net/wireless/mediatek/mt76/mt7921/init.c -o /tmp/kernel-tree/drivers/net/wireless/mediatek/mt76/mt7921/init.c
+          curl -fsSL https://raw.githubusercontent.com/torvalds/linux/master/drivers/net/wireless/mediatek/mt76/mt7921/pci.c -o /tmp/kernel-tree/drivers/net/wireless/mediatek/mt76/mt7921/pci.c
+          curl -fsSL https://raw.githubusercontent.com/ps5-linux/ps5-linux-patches/main/.config -o /tmp/kernel-tree/arch/x86/configs/ps5_defconfig
           git -C /tmp/kernel-tree init
           git -C /tmp/kernel-tree config user.name "CI Validator"
           git -C /tmp/kernel-tree config user.email "ci@ps5-linux.local"
@@ -49,7 +49,11 @@ jobs:
         run: |
           git clone --depth 1 --branch lf-6.18.2_1.0.0 https://github.com/nxp-imx/mwifiex.git /tmp/mwifiex-tree
 
-      - name: Run Sequential Dry-Run Applicator
+      - name: Run Sequential Dry-Run Applicator (Target Kernel 7)
         run: |
           chmod +x patches/wifi/apply_patches.sh
-          ./patches/wifi/apply_patches.sh --dry-run --kernel-dir /tmp/kernel-tree --mwifiex-dir /tmp/mwifiex-tree
+          ./patches/wifi/apply_patches.sh --dry-run --target-kernel 7 --kernel-dir /tmp/kernel-tree --mwifiex-dir /tmp/mwifiex-tree
+
+      - name: Run Sequential Dry-Run Applicator (Target Kernel 6)
+        run: |
+          ./patches/wifi/apply_patches.sh --dry-run --target-kernel 6 --mwifiex-dir /tmp/mwifiex-tree

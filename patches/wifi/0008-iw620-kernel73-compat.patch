@@ -1,0 +1,140 @@
+diff --git a/mlinux/moal_cfg80211.c b/mlinux/moal_cfg80211.c
+index d1308b8..3f193b5 100644
+--- a/mlinux/moal_cfg80211.c
++++ b/mlinux/moal_cfg80211.c
+@@ -3423,8 +3423,15 @@ int woal_cfg80211_mgmt_tx(struct wiphy *wiphy,
+ 			  bool dont_wait_for_ack,
+ #endif
+ #endif
++#if CFG80211_VERSION_CODE >= KERNEL_VERSION(7, 3, 0)
++			  u64 cookie_value)
++#else
+ 			  u64 *cookie)
++#endif
+ {
++#if CFG80211_VERSION_CODE >= KERNEL_VERSION(7, 3, 0)
++	u64 *cookie = &cookie_value;
++#endif
+ #if KERNEL_VERSION(3, 6, 0) <= CFG80211_VERSION_CODE
+ 	struct net_device *dev = wdev->netdev;
+ #endif
+@@ -3641,6 +3648,8 @@ int woal_cfg80211_mgmt_tx(struct wiphy *wiphy,
+ 	}
+ #endif
+ 
++/* cfg80211 owns the cookie starting with Linux 7.3. */
++#if CFG80211_VERSION_CODE < KERNEL_VERSION(7, 3, 0)
+ #if KERNEL_VERSION(3, 8, 0) > LINUX_VERSION_CODE
+ 	*cookie = random32() | 1;
+ #else
+@@ -3650,6 +3659,7 @@ int woal_cfg80211_mgmt_tx(struct wiphy *wiphy,
+ 	*cookie = get_random_u32() | 1;
+ #endif
+ #endif
++#endif
+ 
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+ 	if (len > sizeof(moal_802_11_action_header) &&
+diff --git a/mlinux/moal_cfg80211.h b/mlinux/moal_cfg80211.h
+index a8a64c5..9a8d913 100644
+--- a/mlinux/moal_cfg80211.h
++++ b/mlinux/moal_cfg80211.h
+@@ -324,8 +324,12 @@ int woal_cfg80211_mgmt_tx(struct wiphy *wiphy,
+ 			  bool dont_wait_for_ack,
+ #endif
+ #endif
++#if CFG80211_VERSION_CODE >= KERNEL_VERSION(7, 3, 0)
++			  u64 cookie_value);
++#else
+ 			  u64 *cookie);
+ #endif
++#endif
+ 
+ mlan_status woal_register_cfg80211(moal_private *priv);
+ 
+diff --git a/mlinux/moal_sta_cfg80211.c b/mlinux/moal_sta_cfg80211.c
+index b79bf43..bda0bbc 100644
+--- a/mlinux/moal_sta_cfg80211.c
++++ b/mlinux/moal_sta_cfg80211.c
+@@ -257,7 +257,13 @@ woal_cfg80211_remain_on_channel(struct wiphy *wiphy,
+ #if CFG80211_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 				enum nl80211_channel_type channel_type,
+ #endif
+-				unsigned int duration, u64 *cookie, const u8 *mac_addr);
++				unsigned int duration,
++#if CFG80211_VERSION_CODE >= KERNEL_VERSION(7, 3, 0)
++				u64 cookie_value,
++#else
++				u64 *cookie,
++#endif
++				const u8 *mac_addr);
+ 
+ static int woal_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 6, 0)
+@@ -7647,7 +7653,13 @@ woal_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
+ #if CFG80211_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 				enum nl80211_channel_type channel_type,
+ #endif
+-				unsigned int duration, u64 *cookie, const u8 *mac_addr)
++				unsigned int duration,
++#if CFG80211_VERSION_CODE >= KERNEL_VERSION(7, 3, 0)
++				u64 cookie_value,
++#else
++				u64 *cookie,
++#endif
++				const u8 *mac_addr)
+ #else
+ /**
+  * @brief Make chip remain on channel
+@@ -7668,6 +7680,9 @@ woal_cfg80211_remain_on_channel(struct wiphy *wiphy, struct net_device *dev,
+ 				unsigned int duration, u64 *cookie)
+ #endif
+ {
++#if CFG80211_VERSION_CODE >= KERNEL_VERSION(7, 3, 0)
++	u64 *cookie = &cookie_value;
++#endif
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 6, 0)
+ 	struct net_device *dev = wdev->netdev;
+ #endif
+@@ -7732,6 +7747,8 @@ woal_cfg80211_remain_on_channel(struct wiphy *wiphy, struct net_device *dev,
+ 	}
+ 
+ 	/* remain on channel operation success */
++	/* cfg80211 owns the cookie starting with Linux 7.3. */
++#if CFG80211_VERSION_CODE < KERNEL_VERSION(7, 3, 0)
+ 	/* we need update the value cookie */
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 	*cookie = (u64)random32() | 1;
+@@ -7741,6 +7758,7 @@ woal_cfg80211_remain_on_channel(struct wiphy *wiphy, struct net_device *dev,
+ #else
+ 	*cookie = (u64)get_random_u32() | 1;
+ #endif
++#endif
+ #endif
+ 	priv->phandle->remain_on_channel = MTRUE;
+ 	priv->phandle->remain_bss_index = priv->bss_index;
+@@ -11195,6 +11213,7 @@ done:
+  *
+  *  @return            0 -- success, otherwise fail
+  */
++#if CFG80211_VERSION_CODE < KERNEL_VERSION(7, 3, 0)
+ static int woal_cfg80211_probe_client(struct wiphy *wiphy,
+ 				      struct net_device *dev, const u8 *peer,
+ 				      u64 *cookie)
+@@ -11202,6 +11221,7 @@ static int woal_cfg80211_probe_client(struct wiphy *wiphy,
+ 	return -1;
+ }
+ #endif
++#endif
+ 
+ /**
+  *  @brief Sends deauth packet to kernel
+@@ -11835,7 +11855,7 @@ mlan_status woal_register_cfg80211(moal_private *priv)
+ 		woal_cfg80211_ops.assoc = woal_cfg80211_associate;
+ 		woal_cfg80211_ops.disconnect = NULL;
+ 		woal_cfg80211_ops.connect = NULL;
+-#ifdef UAP_SUPPORT
++#if defined(UAP_SUPPORT) && CFG80211_VERSION_CODE < KERNEL_VERSION(7, 3, 0)
+ 		woal_cfg80211_ops.probe_client = woal_cfg80211_probe_client;
+ #endif
+ 	}
