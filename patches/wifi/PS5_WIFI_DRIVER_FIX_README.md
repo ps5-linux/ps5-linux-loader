@@ -73,7 +73,7 @@ flowchart LR
 | Validation Stage | Scope & Verification Method | Status | Artifact / Output |
 | :--- | :--- | :--- | :--- |
 | **Stage 1: Patch Applicability** | Deep static syntax, hunk math validation, C comment enforcement, and sequential dry-run (`verify_patches.py` & `apply_patches.sh --dry-run`). | **VERIFIED (13/13 PASS)** | 100% clean diffs on Kernel 6.x and 7.x modes. |
-| **Stage 2: Driver Build Verification** | Empirical compilation of both Kernel 6 and Kernel 7 driver stacks against Linux host kernel headers (`.github/workflows/verify-wifi-patches.yml`). | **CI VERIFIED** | `mlan.ko` and `moal.ko` compiled and uploaded as CI artifacts (14-day retention). |
+| **Stage 2: Driver Build Verification** | Empirical compilation of patched mwifiex driver modules against Linux host kernel headers (`.github/workflows/verify-wifi-patches.yml`). | **CI VERIFIED** | `mlan.ko` and `moal.ko` compiled and uploaded as CI artifacts (14-day retention). |
 | **Stage 3: Physical Hardware Runtime** | Runtime association, WPA2/WPA3 handshake, throughput, and power stability on retail PS5 hardware. | **REQUIRES HARDWARE** | Physical console runtime test report. |
 
 ---

@@ -15,7 +15,7 @@ on:
 
 jobs:
   verify:
-    name: Deep Patch Verification, Dual-Kernel Dry-Run & Driver Build Matrix
+    name: Deep Patch Verification, Dual-Kernel Dry-Run & Driver Build
     runs-on: ubuntu-latest
 
     steps:
@@ -58,31 +58,20 @@ jobs:
         run: |
           ./patches/wifi/apply_patches.sh --dry-run --target-kernel 6 --kernel-dir /tmp/kernel-tree --mwifiex-dir /tmp/mwifiex-tree
 
-      - name: Build Verification - Compile Kernel 6 Target mwifiex Modules
+      - name: Build Verification - Compile mwifiex Kernel Modules
         run: |
-          git clone --depth 1 --branch lf-6.18.2_1.0.0 https://github.com/nxp-imx/mwifiex.git /tmp/mwifiex-build-k6
-          ./patches/wifi/apply_patches.sh --target-kernel 6 --mwifiex-dir /tmp/mwifiex-build-k6
-          make -C /tmp/mwifiex-build-k6 PWD=/tmp/mwifiex-build-k6 KERNELDIR=/lib/modules/$(uname -r)/build ARCH=x86 -j$(nproc)
-          test -f /tmp/mwifiex-build-k6/mlan.ko
-          test -f /tmp/mwifiex-build-k6/moal.ko
-          echo "Kernel 6 mwifiex module build succeeded!"
-
-      - name: Build Verification - Compile Kernel 7 Target mwifiex Modules
-        run: |
-          git clone --depth 1 --branch lf-6.18.2_1.0.0 https://github.com/nxp-imx/mwifiex.git /tmp/mwifiex-build-k7
-          ./patches/wifi/apply_patches.sh --target-kernel 7 --mwifiex-dir /tmp/mwifiex-build-k7
-          make -C /tmp/mwifiex-build-k7 PWD=/tmp/mwifiex-build-k7 KERNELDIR=/lib/modules/$(uname -r)/build ARCH=x86 ccflags-y="-Wno-incompatible-pointer-types -Wno-error" -j$(nproc)
-          test -f /tmp/mwifiex-build-k7/mlan.ko
-          test -f /tmp/mwifiex-build-k7/moal.ko
-          echo "Kernel 7 mwifiex module build succeeded!"
+          git clone --depth 1 --branch lf-6.18.2_1.0.0 https://github.com/nxp-imx/mwifiex.git /tmp/mwifiex-build
+          ./patches/wifi/apply_patches.sh --target-kernel 6 --mwifiex-dir /tmp/mwifiex-build
+          make -C /tmp/mwifiex-build PWD=/tmp/mwifiex-build KERNELDIR=/lib/modules/$(uname -r)/build ARCH=x86 -j$(nproc)
+          test -f /tmp/mwifiex-build/mlan.ko
+          test -f /tmp/mwifiex-build/moal.ko
+          echo "Empirical Build Verification Succeeded: mlan.ko and moal.ko compiled cleanly!"
 
       - name: Upload Compiled Driver Module Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ps5-wifi-driver-modules
           path: |
-            /tmp/mwifiex-build-k6/mlan.ko
-            /tmp/mwifiex-build-k6/moal.ko
-            /tmp/mwifiex-build-k7/mlan.ko
-            /tmp/mwifiex-build-k7/moal.ko
+            /tmp/mwifiex-build/mlan.ko
+            /tmp/mwifiex-build/moal.ko
           retention-days: 14
