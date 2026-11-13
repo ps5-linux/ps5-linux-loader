@@ -1,5 +1,5 @@
 From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 2/12] mt7921e: add Salina PCIe initialization retry quirk and u32 bus hang check
+Subject: [PATCH 2/13] mt7921e: add Salina PCIe initialization retry quirk and u32 bus hang check
 
 On PS5 models with Salina southbridge (CFI-12xx and Slim revisions),
 reference clock stabilization may delay MCU responsiveness during

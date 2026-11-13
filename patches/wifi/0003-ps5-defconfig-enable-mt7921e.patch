@@ -1,5 +1,5 @@
 From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
-Subject: [PATCH 3/12] ps5_defconfig: enable MediaTek MT7921E PCIe wireless driver
+Subject: [PATCH 3/13] ps5_defconfig: enable MediaTek MT7921E PCIe wireless driver
 
 Enable kernel configuration symbols for MT7921E PCIe Wi-Fi support
 found on PlayStation 5 Slim and CFI-12xx chassis revisions.

@@ -1,4 +1,4 @@
-# PlayStation 5 Wi-Fi Driver Fix Suite (v5)
+# PlayStation 5 Wi-Fi Driver Fix Suite (v6)
 
 Comprehensive driver fix suite and patches providing empirical, full Wi-Fi support across all PlayStation 5 hardware revisions:
 - **MediaTek MT7921 / MT7921e** (`14c3:7961` on Sony Salina Southbridge PCIe `0000:40:00.7` - CFI-12xx & Slim revisions).
@@ -66,19 +66,15 @@ We clearly delineate what is empirically proven by automated CI versus what requ
 
 ```mermaid
 flowchart LR
-    A["Stage 1: Patch Applicability\n(Static & Dry-Run 13/13 PASS)"] --> B["Stage 2: Module Compilation\n(CI Build Verified: mlan.ko & moal.ko)"]
+    A["Stage 1: Patch Applicability\n(Static & Dry-Run 13/13 PASS)"] --> B["Stage 2: Driver Build Verification\n(CI Build Matrix: mlan.ko & moal.ko)"]
     B --> C["Stage 3: Physical Hardware\n(Requires PS5 Console & AP link)"]
 ```
 
-1. **Stage 1: Sequential Patch Applicability (Verified)**:
-   - Deep static syntax and math validation (`verify_patches.py`): 13/13 patches PASS, 0 errors, 0 C++ comments, 0 truncation anti-patterns.
-   - Sequential dry-run applicability (`apply_patches.sh --dry-run`): 100% PASS for both Kernel 6.x and Kernel 7.x modes.
-2. **Stage 2: Driver Build Verification (CI Verified)**:
-   - Empirical compilation of the patched `mwifiex` driver against Linux host kernel headers in `.github/workflows/verify-wifi-patches.yml`.
-   - Guarantees `mlan.ko` and `moal.ko` compile cleanly without undefined symbols or compiler errors.
-3. **Stage 3: Physical Hardware Runtime Validation (Requires Hardware Console)**:
-   - Testing on physical PS5 retail hardware (CFI-10xx/11xx for IW620, CFI-12xx/Slim for MT7921).
-   - Validates physical PCIe link retraining, AP association under WPA3/WPA2, and long-running uptime beyond 20s.
+| Validation Stage | Scope & Verification Method | Status | Artifact / Output |
+| :--- | :--- | :--- | :--- |
+| **Stage 1: Patch Applicability** | Deep static syntax, hunk math validation, C comment enforcement, and sequential dry-run (`verify_patches.py` & `apply_patches.sh --dry-run`). | **VERIFIED (13/13 PASS)** | 100% clean diffs on Kernel 6.x and 7.x modes. |
+| **Stage 2: Driver Build Verification** | Empirical compilation of both Kernel 6 and Kernel 7 driver stacks against Linux host kernel headers (`.github/workflows/verify-wifi-patches.yml`). | **CI VERIFIED** | `mlan.ko` and `moal.ko` compiled and uploaded as CI artifacts (14-day retention). |
+| **Stage 3: Physical Hardware Runtime** | Runtime association, WPA2/WPA3 handshake, throughput, and power stability on retail PS5 hardware. | **REQUIRES HARDWARE** | Physical console runtime test report. |
 
 ---
 
