@@ -1,0 +1,149 @@
+diff --git a/mlan/mlan_11ax.c b/mlan/mlan_11ax.c
+--- a/mlan/mlan_11ax.c
++++ b/mlan/mlan_11ax.c
+@@ -30,6 +30,52 @@
+ #include "mlan_11n.h"
+ #include "mlan_11ax.h"
+ #include "mlan_11ac.h"
++
++#ifdef PCIE9097
++/* Match the incomplete HE TLV before changing its length or PPE fields. */
++static t_u32 wlan_iw620_he_profile(t_u8 *tlv, t_u32 total, t_u32 capacity)
++{
++	static const t_u8 fw_5g[22] = {
++		0x23, 0x01, 0x00, 0x00, 0x82, 0x00, 0x08,
++		0x04, 0x70, 0x7e, 0xc9, 0xfd, 0x01, 0xa0, 0x0e,
++		0x01, 0x3d, 0x00, 0xfa, 0xff, 0xfa, 0xff
++	};
++	/* Corrected 5 GHz STA profile, including its four PPE bytes. */
++	static const t_u8 fixed_5g[26] = {
++		0x23, 0x00, 0x00, 0x00, 0x82, 0x00, 0x08,
++		0x04, 0x70, 0x7e, 0xc9, 0xfd, 0x01, 0xa0, 0x0a,
++		0x03, 0x3d, 0x00, 0xfa, 0xff, 0xfa, 0xff,
++		0xe1, 0xff, 0xc7, 0x71
++	};
++	t_u32 i;
++	t_bool is_2g;
++
++	if (!tlv || total != 26 || capacity < total ||
++	    tlv[0] != 0xff || tlv[1] || tlv[2] != 22 || tlv[3])
++		return 0;
++	is_2g = tlv[11] == 0x02;
++	for (i = 0; i < sizeof(fw_5g); i++) {
++		t_u8 expected = fw_5g[i];
++		if (is_2g && i == 7)
++			expected = 0x02;
++		if (is_2g && i == 15)
++			expected = 0x03;
++		if (tlv[4 + i] != expected)
++			return 0;
++	}
++	if (!is_2g) {
++		if (capacity < 30)
++			return 0;
++		for (i = 0; i < sizeof(fixed_5g); i++)
++			tlv[4 + i] = fixed_5g[i];
++		tlv[2] = sizeof(fixed_5g);
++		return 30;
++	}
++	/* No 2 GHz PPE bytes exist: keep association and cfg80211 consistent. */
++	tlv[17] &= ~0x80;
++	return 26;
++}
++#endif
+ 
+ /********************************************************
+ 			Local Variables
+@@ -574,6 +620,24 @@
+ 			    (t_u8 *)pmadapter->hw_he_cap,
+ 			    pmadapter->hw_hecap_len);
+ 	}
++#ifdef PCIE9097
++	if (pmadapter->card_type == CARD_TYPE_PCIE9097) {
++		t_u8 *cached = he_cap_2g ? pmadapter->hw_2g_he_cap :
++					 pmadapter->hw_he_cap;
++		t_u32 cached_len = he_cap_2g ? pmadapter->hw_2g_hecap_len :
++					      pmadapter->hw_hecap_len;
++		t_u32 new_len = wlan_iw620_he_profile(
++			cached, cached_len, sizeof(pmadapter->hw_he_cap));
++
++		if (new_len) {
++			if (he_cap_2g)
++				pmadapter->hw_2g_hecap_len = new_len;
++			else
++				pmadapter->hw_hecap_len = new_len;
++		}
++	}
++#endif
++	/* Propagate the same profile into all per-interface copies. */
+ 	for (i = 0; i < pmadapter->priv_num; i++) {
+ 		if (pmadapter->priv[i]) {
+ 			pmadapter->priv[i]->config_bands =
+diff --git a/mlan/mlan_sta_cmd.c b/mlan/mlan_sta_cmd.c
+--- a/mlan/mlan_sta_cmd.c
++++ b/mlan/mlan_sta_cmd.c
+@@ -4700,6 +4700,28 @@
+ 		ret = MLAN_STATUS_FAILURE;
+ 		goto done;
+ 	}
++#ifdef PCIE9097
++	/* Configure the corrected profile in firmware and during association.
++	 * Preserve MAC_CONTROL as the final init command.
++	 */
++	if (pmpriv->adapter->card_type == CARD_TYPE_PCIE9097 &&
++	    pmpriv->bss_type == MLAN_BSS_TYPE_STA &&
++	    pmpriv->user_hecap_len == 30 &&
++	    pmpriv->user_he_cap[5] == 0 &&
++	    pmpriv->user_he_cap[26] == 0xe1) {
++		mlan_ds_11ax_he_cfg he_cfg;
++
++		memset(pmpriv->adapter, &he_cfg, 0, sizeof(he_cfg));
++		he_cfg.band = 2;
++		memcpy_ext(pmpriv->adapter, &he_cfg.he_cap,
++			   pmpriv->user_he_cap, pmpriv->user_hecap_len,
++			   sizeof(he_cfg.he_cap));
++		ret = wlan_prepare_cmd(pmpriv, HostCmd_CMD_11AX_CFG,
++				       HostCmd_ACT_GEN_SET, 0, MNULL, &he_cfg);
++		if (ret)
++			goto done;
++	}
++#endif
+ 	/* MAC Control must be the last command in init_fw */
+ 	/* set MAC Control */
+ 	ret = wlan_prepare_cmd(pmpriv, HostCmd_CMD_MAC_CONTROL,
+diff --git a/mlinux/moal_cfg80211.c b/mlinux/moal_cfg80211.c
+--- a/mlinux/moal_cfg80211.c
++++ b/mlinux/moal_cfg80211.c
+@@ -5560,7 +5560,13 @@
+ 	if (band->band == NL80211_BAND_5GHZ && fw_info.fw_bands & BAND_AAX) {
+ 		phe_cap = (mlan_ds_11ax_he_capa *)fw_info.hw_he_cap;
+ 		hw_hecap_len = fw_info.hw_hecap_len;
+-		woal_uap_update_11ax_ie(BAND_5GHZ, phe_cap);
++#ifdef PCIE9097
++		/* Do not apply the AP-only mask to the corrected IW620 STA profile. */
++		if (!(priv->phandle->card_type == CARD_TYPE_PCIE9097 &&
++		      priv->bss_type == MLAN_BSS_TYPE_STA &&
++		      hw_hecap_len == 30 && phe_cap->he_mac_cap[0] == 0))
++#endif
++			woal_uap_update_11ax_ie(BAND_5GHZ, phe_cap);
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+ 	} else if (band->band == NL80211_BAND_6GHZ &&
+ 		   fw_info.fw_bands & BAND_6G) {
+diff --git a/mlan/mlan_11n.c b/mlan/mlan_11n.c
+--- a/mlan/mlan_11n.c
++++ b/mlan/mlan_11n.c
+@@ -3008,6 +3008,14 @@
+ 	    (priv->aggr_prio_tbl[tid].amsdu != BA_STREAM_NOT_ALLOWED))
+ 		add_ba_req.block_ack_param_set |= BLOCKACKPARAM_AMSDU_SUPP_MASK;
+ 	add_ba_req.block_ack_tmo = (t_u16)priv->add_ba_param.timeout;
++#ifdef PCIE9097
++	/* Request no TX BA inactivity timeout. Apply here so
++	 * later defaults/coexistence updates cannot restore a nonzero value.
++	 */
++	if (priv->adapter->card_type == CARD_TYPE_PCIE9097 &&
++	    priv->bss_type == MLAN_BSS_TYPE_STA)
++		add_ba_req.block_ack_tmo = 0;
++#endif
+ 
+ 	++dialog_tok;
+ 

@@ -1,0 +1,437 @@
+diff --git a/mlinux/moal_ioctl.c b/mlinux/moal_ioctl.c
+index f6c8918..22be50b 100644
+--- a/mlinux/moal_ioctl.c
++++ b/mlinux/moal_ioctl.c
+@@ -2319,17 +2319,17 @@ mlan_status woal_request_get_fw_info(moal_private *priv, t_u8 wait_option,
+ 				&info->param.fw_info.fw_ver,
+ 				sizeof(info->param.fw_info.fw_ver),
+ 				sizeof(priv->phandle->fw_release_number));
+-		strncpy(priv->phandle->fw_ver_milestone,
++		strscpy(priv->phandle->fw_ver_milestone,
+ 			info->param.fw_info.fw_ver_milestone,
+ 			sizeof(priv->phandle->fw_ver_milestone) - 1);
+ 		priv->phandle->fw_ver_milestone
+ 			[sizeof(priv->phandle->fw_ver_milestone) - 1] = '\0';
+-		strncpy(priv->phandle->fw_ver_buildtype,
++		strscpy(priv->phandle->fw_ver_buildtype,
+ 			info->param.fw_info.fw_ver_buildtype,
+ 			sizeof(priv->phandle->fw_ver_buildtype) - 1);
+ 		priv->phandle->fw_ver_buildtype
+ 			[sizeof(priv->phandle->fw_ver_buildtype) - 1] = '\0';
+-		strncpy(priv->phandle->fw_ver_data,
++		strscpy(priv->phandle->fw_ver_data,
+ 			info->param.fw_info.fw_ver_data,
+ 			sizeof(priv->phandle->fw_ver_data) - 1);
+ 		priv->phandle
+@@ -6718,7 +6718,7 @@ mlan_status woal_set_bg_scan(moal_private *priv, char *buf, int length)
+ 			}
+ 			if (ssid_len &&
+ 			    (num_ssid < (MRVDRV_MAX_SSID_LIST_LENGTH - 1))) {
+-				strncpy(priv->scan_cfg.ssid_list[num_ssid].ssid,
++				strscpy(priv->scan_cfg.ssid_list[num_ssid].ssid,
+ 					ptr + 2, ssid_len);
+ 				priv->scan_cfg.ssid_list[num_ssid].max_len = 0;
+ 				PRINTM(MIOCTL, "BG scan: ssid=%s\n",
+@@ -6830,7 +6830,7 @@ void woal_config_bgscan_and_rssi(moal_private *priv, t_u8 set_rssi)
+ 		return;
+ 	}
+ 	memset(&priv->scan_cfg, 0, sizeof(priv->scan_cfg));
+-	strncpy(priv->scan_cfg.ssid_list[0].ssid, bss_info.ssid.ssid,
++	strscpy(priv->scan_cfg.ssid_list[0].ssid, bss_info.ssid.ssid,
+ 		bss_info.ssid.ssid_len);
+ 	priv->scan_cfg.ssid_list[0].max_len = 0;
+ 
+@@ -7409,7 +7409,7 @@ int woal_set_combo_scan(moal_private *priv, char *buf, int length)
+ 			}
+ 			if (ssid_len &&
+ 			    (num_ssid < (MRVDRV_MAX_SSID_LIST_LENGTH - 1))) {
+-				strncpy(scan_cfg->ssid_list[num_ssid].ssid,
++				strscpy(scan_cfg->ssid_list[num_ssid].ssid,
+ 					ptr + 2, ssid_len);
+ 				scan_cfg->ssid_list[num_ssid].max_len = 0;
+ 				PRINTM(MIOCTL, "Combo scan: ssid=%s\n",
+@@ -9754,7 +9754,7 @@ static int parse_set_debug_temperature(const char *s, size_t len,
+ 		goto done;
+ 	}
+ 
+-	strncpy(string, s + prefix_len, MAX_THERMAL_SIMULATION_LEN - 1);
++	strscpy(string, s + prefix_len, MAX_THERMAL_SIMULATION_LEN - 1);
+ 	string[MAX_THERMAL_SIMULATION_LEN - 1] = '\0';
+ 
+ 	temp = strstrip(string);
+diff --git a/mlinux/moal_main.c b/mlinux/moal_main.c
+index 0214fc3..9148a45 100644
+--- a/mlinux/moal_main.c
++++ b/mlinux/moal_main.c
+@@ -3267,7 +3267,7 @@ static t_u32 woal_process_init_cfg(moal_handle *handle, const t_u8 *data,
+ 			else
+ 				intf_e = NULL;
+ 			if (intf_s != NULL && intf_e != NULL) {
+-				strncpy(bss_mac_addr, intf_e + 1,
++				strscpy(bss_mac_addr, intf_e + 1,
+ 					MAX_MAC_ADDR_LEN - 1);
+ 				bss_mac_addr[MAX_MAC_ADDR_LEN - 1] = '\0';
+ 				if ((intf_e - intf_s) > MAX_PARAM_LEN) {
+@@ -3283,7 +3283,7 @@ static t_u32 woal_process_init_cfg(moal_handle *handle, const t_u8 *data,
+ 					       __LINE__);
+ 					goto done;
+ 				}
+-				strncpy(bss_mac_name, intf_s + 1, j);
++				strscpy(bss_mac_name, intf_s + 1, j);
+ 				bss_mac_name[j] = '\0';
+ 				for (i = 0; i < handle->priv_num; i++) {
+ 					if (!handle->priv[i])
+@@ -3364,7 +3364,7 @@ static t_u32 woal_process_init_cfg(moal_handle *handle, const t_u8 *data,
+ 				intf_e = NULL;
+ 			if (intf_s != NULL && intf_e != NULL) {
+ 				/* Copy type */
+-				strncpy(type, intf_s + 1, 1);
++				strscpy(type, intf_s + 1, 1);
+ 				type[1] = '\0';
+ 			} else {
+ 				PRINTM(MERROR, "Wrong config file format %d\n",
+@@ -3388,7 +3388,7 @@ static t_u32 woal_process_init_cfg(moal_handle *handle, const t_u8 *data,
+ 					goto done;
+ 				}
+ 				/* Copy offset */
+-				strncpy(offset, intf_s, j);
++				strscpy(offset, intf_s, j);
+ 				offset[j] = '\0';
+ 			} else {
+ 				PRINTM(MERROR, "Wrong config file format %d\n",
+@@ -3469,7 +3469,7 @@ static mlan_status woal_process_hostcmd_cfg(moal_private *priv, t_u8 *data,
+ 		goto done;
+ 	}
+ 	ptr = buf;
+-	strncpy(ptr, CMD_STR, CMD_BUF_LEN);
++	strscpy(ptr, CMD_STR, CMD_BUF_LEN);
+ 	ptr = buf + strlen(CMD_STR) + sizeof(t_u32);
+ 	while ((pos - data) < size) {
+ 		temp = pos;
+@@ -6547,7 +6547,7 @@ moal_private *woal_add_interface(moal_handle *handle, t_u8 bss_index,
+ 		}
+ 	}
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 12, 0)
+-	strncpy(csa_str, "CSA", sizeof(csa_str));
++	strscpy(csa_str, "CSA", sizeof(csa_str));
+ 	strncat(csa_str, name, sizeof(csa_str) - 4);
+ 	priv->csa_workqueue = alloc_workqueue(
+ 		csa_str, WQ_HIGHPRI | WQ_MEM_RECLAIM | WQ_UNBOUND, 1);
+@@ -11733,7 +11733,7 @@ t_void woal_store_firmware_dump(moal_handle *phandle, mlan_event *pmevent)
+ 					     sizeof(path_name));
+ #else
+ 			memset(path_name, 0, sizeof(path_name));
+-			strncpy(path_name, "/data", sizeof(path_name));
++			strscpy(path_name, "/data", sizeof(path_name));
+ #endif
+ 			PRINTM(MMSG, "Firmware Dump directory name is %s\n",
+ 			       path_name);
+@@ -13084,7 +13084,7 @@ mlan_status woal_request_country_power_table(moal_private *priv, char *country,
+ 	/* file_path should be Null terminated */
+ 	if (fw_name) {
+ 		/* file_path[] needs to be reset to 0 before here */
+-		strncpy(file_path, fw_name, sizeof(file_path) - 1);
++		strscpy(file_path, fw_name, sizeof(file_path) - 1);
+ 		last_slash = strrchr(file_path, '/');
+ 		if (last_slash)
+ 			memset(last_slash + 1, 0,
+@@ -13099,7 +13099,7 @@ mlan_status woal_request_country_power_table(moal_private *priv, char *country,
+ 
+ 	if ((strlen(file_path) + strlen(country_name)) <
+ 	    (sizeof(file_path) - 1))
+-		strncpy(file_path + strlen(file_path), country_name,
++		strscpy(file_path + strlen(file_path), country_name,
+ 			sizeof(file_path) - strlen(file_path) - 1);
+ 	else {
+ 		PRINTM(MERROR,
+@@ -13142,7 +13142,7 @@ mlan_status woal_request_country_power_table(moal_private *priv, char *country,
+ 				memset(file_path, 0, sizeof(file_path));
+ 			if ((strlen(file_path) + strlen(country_name)) <
+ 			    (sizeof(file_path) - 1))
+-				strncpy(file_path + strlen(file_path),
++				strscpy(file_path + strlen(file_path),
+ 					country_name,
+ 					sizeof(file_path) - strlen(file_path) -
+ 						1);
+diff --git a/mlinux/moal_eth_ioctl.c b/mlinux/moal_eth_ioctl.c
+index f093c86..ff509ac 100644
+--- a/mlinux/moal_eth_ioctl.c
++++ b/mlinux/moal_eth_ioctl.c
+@@ -7732,7 +7732,7 @@ static int woal_priv_regrdwr(moal_private *priv, t_u8 *respbuf,
+ 		ret = -ENOMEM;
+ 		goto done;
+ 	}
+-	strncpy(arguments, respbuf + header_len,
++	strscpy(arguments, respbuf + header_len,
+ 		strlen(respbuf) * sizeof(char));
+ 	/* respbuf is already null-terminated by calling function and hence
+ 	 * arguments is also null-terminated
+diff --git a/mlinux/moal_init.c b/mlinux/moal_init.c
+index 1979042..e75b9dc 100644
+--- a/mlinux/moal_init.c
++++ b/mlinux/moal_init.c
+@@ -1307,7 +1307,7 @@ static mlan_status parse_cfg_read_block(t_u8 *data, t_u32 size,
+ 			if (params->txpwrlimit_cfg) {
+ 				memset(handle->mode_psd_file, 0,
+ 				       sizeof(handle->mode_psd_file));
+-				strncpy(handle->mode_psd_file,
++				strscpy(handle->mode_psd_file,
+ 					params->txpwrlimit_cfg,
+ 					sizeof(handle->mode_psd_file) - 1);
+ 				handle->mode_psd_file
+@@ -2259,7 +2259,7 @@ static void woal_setup_module_param(moal_handle *handle, moal_mod_para *params)
+ 
+ 	if (handle->params.txpwrlimit_cfg) {
+ 		memset(handle->mode_psd_file, 0, sizeof(handle->mode_psd_file));
+-		strncpy(handle->mode_psd_file, handle->params.txpwrlimit_cfg,
++		strscpy(handle->mode_psd_file, handle->params.txpwrlimit_cfg,
+ 			sizeof(handle->mode_psd_file) - 1);
+ 		handle->mode_psd_file[sizeof(handle->mode_psd_file) - 1] = '\0';
+ 		PRINTM(MINFO, "Mode PSD file name: %s", handle->mode_psd_file);
+diff --git a/mlinux/moal_uap.c b/mlinux/moal_uap.c
+index e4ec685..249e5d7 100644
+--- a/mlinux/moal_uap.c
++++ b/mlinux/moal_uap.c
+@@ -4072,7 +4072,7 @@ static int woal_uap_ap_cfg_parse_data(moal_private *priv,
+ 					goto done;
+ 				}
+ 				ap_cfg->ssid.ssid_len = strlen(value);
+-				strncpy((char *)ap_cfg->ssid.ssid, value,
++				strscpy((char *)ap_cfg->ssid.ssid, value,
+ 					MLAN_MAX_SSID_LENGTH - 1);
+ 				ap_cfg->ssid.ssid[MLAN_MAX_SSID_LENGTH - 1] =
+ 					'\0';
+diff --git a/mlinux/moal_cfg80211_util.c b/mlinux/moal_cfg80211_util.c
+index 9869684..d93e93a 100644
+--- a/mlinux/moal_cfg80211_util.c
++++ b/mlinux/moal_cfg80211_util.c
+@@ -973,7 +973,7 @@ static int woal_cfg80211_subcmd_set_country_code(struct wiphy *wiphy,
+ 		type = nla_type(iter);
+ 		switch (type) {
+ 		case ATTR_COUNTRY_CODE:
+-			strncpy(country, nla_data(iter),
++			strscpy(country, nla_data(iter),
+ 				MIN((int)sizeof(country) - 1, nla_len(iter)));
+ 			break;
+ 		default:
+@@ -1273,7 +1273,7 @@ static int woal_cfg80211_subcmd_start_logging(struct wiphy *wiphy,
+ 		type = nla_type(iter);
+ 		switch (type) {
+ 		case ATTR_WIFI_LOGGER_RING_ID:
+-			strncpy(ring_name, nla_data(iter),
++			strscpy(ring_name, nla_data(iter),
+ 				MIN(sizeof(ring_name) - 1, nla_len(iter)));
+ 			break;
+ 		case ATTR_WIFI_LOGGER_VERBOSE_LEVEL:
+@@ -1368,7 +1368,7 @@ static int woal_cfg80211_subcmd_get_ring_data(struct wiphy *wiphy,
+ 		type = nla_type(iter);
+ 		switch (type) {
+ 		case ATTR_WIFI_LOGGER_RING_ID:
+-			strncpy(ring_name, nla_data(iter),
++			strscpy(ring_name, nla_data(iter),
+ 				MIN(sizeof(ring_name) - 1, nla_len(iter)));
+ 			break;
+ 		default:
+diff --git a/mlinux/moal_sta_cfg80211.c b/mlinux/moal_sta_cfg80211.c
+index 58d4592..431878f 100644
+--- a/mlinux/moal_sta_cfg80211.c
++++ b/mlinux/moal_sta_cfg80211.c
+@@ -257,7 +257,7 @@ woal_cfg80211_remain_on_channel(struct wiphy *wiphy,
+ #if CFG80211_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 				enum nl80211_channel_type channel_type,
+ #endif
+-				unsigned int duration, u64 *cookie);
++				unsigned int duration, u64 *cookie, const u8 *mac_addr);
+ 
+ static int woal_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
+ #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 6, 0)
+@@ -7631,7 +7654,7 @@ woal_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
+ #if CFG80211_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 				enum nl80211_channel_type channel_type,
+ #endif
+-				unsigned int duration, u64 *cookie)
++				unsigned int duration, u64 *cookie, const u8 *mac_addr)
+ #else
+ /**
+  * @brief Make chip remain on channel
+@@ -7892,7 +7915,7 @@ int woal_cfg80211_sched_scan_start(struct wiphy *wiphy, struct net_device *dev,
+ 		priv->scan_cfg.start_later = MTRUE;
+ 	for (i = 0; i < request->n_ssids; i++) {
+ 		ssid = &request->ssids[i];
+-		strncpy(priv->scan_cfg.ssid_list[index].ssid, ssid->ssid,
++		strscpy(priv->scan_cfg.ssid_list[index].ssid, ssid->ssid,
+ 			ssid->ssid_len);
+ 		if (ssid->ssid_len) {
+ 			priv->scan_cfg.ssid_list[index].max_len = 0;
+@@ -7911,7 +7934,7 @@ int woal_cfg80211_sched_scan_start(struct wiphy *wiphy, struct net_device *dev,
+ 				break;
+ 		}
+ 		if (j == request->n_ssids) {
+-			strncpy(priv->scan_cfg.ssid_list[index].ssid,
++			strscpy(priv->scan_cfg.ssid_list[index].ssid,
+ 				match_ssid->ssid, match_ssid->ssid_len);
+ 			priv->scan_cfg.ssid_list[index].max_len =
+ 				match_ssid->ssid_len;
+@@ -12468,10 +12492,10 @@ void woal_dnld_sta_6e_psd_table(moal_private *priv, t_u8 *resp_buf,
+ 	/* Indoor Mode */
+ 	case AP_MODE_IND: {
+ 		/* Copy the initial Reg power string */
+-		strncpy(priv->phandle->mode_psd_string,
++		strscpy(priv->phandle->mode_psd_string,
+ 			"region_pwr_cfg_6G_PSD_",
+ 			strlen("region_pwr_cfg_6G_PSD_") + 1);
+-		strncpy(priv->phandle->mode_psd_ru_string,
++		strscpy(priv->phandle->mode_psd_ru_string,
+ 			"subband_ru_power_cfg_6G_PSD_",
+ 			strlen("subband_ru_power_cfg_6G_PSD_") + 1);
+ 
+@@ -12514,10 +12538,10 @@ void woal_dnld_sta_6e_psd_table(moal_private *priv, t_u8 *resp_buf,
+ 	/* Standard Power Mode */
+ 	case AP_MODE_SP: {
+ 		/* Copy the initial Reg power string */
+-		strncpy(priv->phandle->mode_psd_string,
++		strscpy(priv->phandle->mode_psd_string,
+ 			"region_pwr_cfg_6G_PSD_",
+ 			strlen("region_pwr_cfg_6G_PSD_") + 1);
+-		strncpy(priv->phandle->mode_psd_ru_string,
++		strscpy(priv->phandle->mode_psd_ru_string,
+ 			"subband_ru_power_cfg_6G_PSD_",
+ 			strlen("subband_ru_power_cfg_6G_PSD_") + 1);
+ 
+@@ -12560,10 +12584,10 @@ void woal_dnld_sta_6e_psd_table(moal_private *priv, t_u8 *resp_buf,
+ 	/* Very Low Power Mode */
+ 	case AP_MODE_VLP: {
+ 		/* Copy the initial Reg power string */
+-		strncpy(priv->phandle->mode_psd_string,
++		strscpy(priv->phandle->mode_psd_string,
+ 			"region_pwr_cfg_6G_PSD_",
+ 			strlen("region_pwr_cfg_6G_PSD_") + 1);
+-		strncpy(priv->phandle->mode_psd_ru_string,
++		strscpy(priv->phandle->mode_psd_ru_string,
+ 			"subband_ru_power_cfg_6G_PSD_",
+ 			strlen("subband_ru_power_cfg_6G_PSD_") + 1);
+ 
+@@ -12648,9 +12672,9 @@ mlan_status woal_dnld_default_6e_psd_table(moal_private *priv)
+ 	       sizeof(priv->phandle->mode_psd_ru_string));
+ 
+ 	/* Copy the initial Reg power string */
+-	strncpy(priv->phandle->mode_psd_string, "region_pwr_cfg_6G",
++	strscpy(priv->phandle->mode_psd_string, "region_pwr_cfg_6G",
+ 		strlen("region_pwr_cfg_6G") + 1);
+-	strncpy(priv->phandle->mode_psd_ru_string, "subband_ru_power_cfg_6G",
++	strscpy(priv->phandle->mode_psd_ru_string, "subband_ru_power_cfg_6G",
+ 		strlen("subband_ru_power_cfg_6G") + 1);
+ 
+ 	PRINTM(MINFO, "Opmode string = %s ru string = %s\n",
+diff --git a/mlinux/moal_uap_cfg80211.c b/mlinux/moal_uap_cfg80211.c
+index 1c31a2a..c48dff2 100644
+--- a/mlinux/moal_uap_cfg80211.c
++++ b/mlinux/moal_uap_cfg80211.c
+@@ -1399,10 +1399,10 @@ void woal_dnld_uap_6e_psd_table(moal_private *priv, const t_u8 *beacon_buf,
+ 		/* Indoor Mode */
+ 		case UAP_MODE_IND: {
+ 			/* Copy the initial Reg power string */
+-			strncpy(priv->phandle->mode_psd_string,
++			strscpy(priv->phandle->mode_psd_string,
+ 				"region_pwr_cfg_6G_PSD_",
+ 				strlen("region_pwr_cfg_6G_PSD_") + 1);
+-			strncpy(priv->phandle->mode_psd_ru_string,
++			strscpy(priv->phandle->mode_psd_ru_string,
+ 				"subband_ru_power_cfg_6G_PSD_",
+ 				strlen("subband_ru_power_cfg_6G_PSD_") + 1);
+ 
+@@ -1452,10 +1452,10 @@ void woal_dnld_uap_6e_psd_table(moal_private *priv, const t_u8 *beacon_buf,
+ 		/* Standard Power Mode */
+ 		case UAP_MODE_SP: {
+ 			/* Copy the initial Reg power string */
+-			strncpy(priv->phandle->mode_psd_string,
++			strscpy(priv->phandle->mode_psd_string,
+ 				"region_pwr_cfg_6G_PSD_",
+ 				strlen("region_pwr_cfg_6G_PSD_") + 1);
+-			strncpy(priv->phandle->mode_psd_ru_string,
++			strscpy(priv->phandle->mode_psd_ru_string,
+ 				"subband_ru_power_cfg_6G_PSD_",
+ 				strlen("subband_ru_power_cfg_6G_PSD_") + 1);
+ 
+@@ -1505,10 +1505,10 @@ void woal_dnld_uap_6e_psd_table(moal_private *priv, const t_u8 *beacon_buf,
+ 		/* Very Low Power Mode */
+ 		case UAP_MODE_VLP: {
+ 			/* Copy the initial Reg power string */
+-			strncpy(priv->phandle->mode_psd_string,
++			strscpy(priv->phandle->mode_psd_string,
+ 				"region_pwr_cfg_6G_PSD_",
+ 				strlen("region_pwr_cfg_6G_PSD_") + 1);
+-			strncpy(priv->phandle->mode_psd_ru_string,
++			strscpy(priv->phandle->mode_psd_ru_string,
+ 				"subband_ru_power_cfg_6G_PSD_",
+ 				strlen("subband_ru_power_cfg_6G_PSD_") + 1);
+ 
+diff --git a/mlinux/moal_proc.c b/mlinux/moal_proc.c
+index ca9d7cf..7f9f680 100644
+--- a/mlinux/moal_proc.c
++++ b/mlinux/moal_proc.c
+@@ -1639,7 +1639,7 @@ void woal_proc_init(moal_handle *handle)
+ 		goto done;
+ 	}
+ 
+-	strncpy(config_proc_dir, "config", sizeof(config_proc_dir));
++	strscpy(config_proc_dir, "config", sizeof(config_proc_dir));
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
+ 	r = proc_create_data(config_proc_dir, 0666, handle->proc_wlan,
+ 			     &config_proc_fops, handle);
+@@ -1654,7 +1654,7 @@ void woal_proc_init(moal_handle *handle)
+ 		PRINTM(MERROR, "Fail to create proc config\n");
+ 
+ #ifdef DUMP_TO_PROC
+-	strncpy(drv_dump_dir, "drv_dump", sizeof(drv_dump_dir));
++	strscpy(drv_dump_dir, "drv_dump", sizeof(drv_dump_dir));
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
+ 	r = proc_create_data(drv_dump_dir, 0644, handle->proc_wlan,
+ 			     &drv_dump_fops, handle);
+@@ -1668,7 +1668,7 @@ void woal_proc_init(moal_handle *handle)
+ 	if (!r)
+ 		PRINTM(MERROR, "Failed to create proc drv dump\n");
+ 
+-	strncpy(fw_dump_dir, "fw_dump", sizeof(fw_dump_dir));
++	strscpy(fw_dump_dir, "fw_dump", sizeof(fw_dump_dir));
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
+ 	r = proc_create_data(fw_dump_dir, 0644, handle->proc_wlan,
+ 			     &fw_dump_fops, handle);
+@@ -1683,7 +1683,7 @@ void woal_proc_init(moal_handle *handle)
+ 		PRINTM(MERROR, "Failed to create proc fw dump\n");
+ 
+ #if defined(PCIE)
+-	strncpy(ssu_dump_dir, "ssu_dump", sizeof(ssu_dump_dir));
++	strscpy(ssu_dump_dir, "ssu_dump", sizeof(ssu_dump_dir));
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
+ 	r = proc_create_data(ssu_dump_dir, 0644, handle->proc_wlan,
+ 			     &ssu_dump_fops, handle);
+@@ -1725,15 +1725,15 @@ void woal_proc_exit(moal_handle *handle)
+ 
+ 	PRINTM(MINFO, "Remove Proc Interface %s\n", handle->proc_wlan_name);
+ 	if (handle->proc_wlan) {
+-		strncpy(config_proc_dir, "config", sizeof(config_proc_dir));
++		strscpy(config_proc_dir, "config", sizeof(config_proc_dir));
+ 		remove_proc_entry(config_proc_dir, handle->proc_wlan);
+ #ifdef DUMP_TO_PROC
+-		strncpy(drv_dump_dir, "drv_dump", sizeof(drv_dump_dir));
++		strscpy(drv_dump_dir, "drv_dump", sizeof(drv_dump_dir));
+ 		remove_proc_entry(drv_dump_dir, handle->proc_wlan);
+-		strncpy(fw_dump_dir, "fw_dump", sizeof(fw_dump_dir));
++		strscpy(fw_dump_dir, "fw_dump", sizeof(fw_dump_dir));
+ 		remove_proc_entry(fw_dump_dir, handle->proc_wlan);
+ #if defined(PCIE)
+-		strncpy(ssu_dump_dir, "ssu_dump", sizeof(ssu_dump_dir));
++		strscpy(ssu_dump_dir, "ssu_dump", sizeof(ssu_dump_dir));
+ 		remove_proc_entry(ssu_dump_dir, handle->proc_wlan);
+ #endif
+ #endif
+@@ -1846,7 +1846,7 @@ void woal_create_proc_entry(moal_private *priv)
+ 		atomic_inc(&(priv->phandle->proc_wlan->count));
+ #endif /* < 3.10.0 */
+ #endif /* < 2.6.26 */
+-		strncpy(priv->proc_entry_name, dev->name, IFNAMSIZ - 1);
++		strscpy(priv->proc_entry_name, dev->name, IFNAMSIZ - 1);
+ 		if (priv->proc_entry) {
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
+ 			r = proc_create_data("info", 0, priv->proc_entry,

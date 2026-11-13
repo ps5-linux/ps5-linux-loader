@@ -1,0 +1,89 @@
+diff --git a/mlinux/moal_pcie.c b/mlinux/moal_pcie.c
+index acd8840..8b91b16 100644
+--- a/mlinux/moal_pcie.c
++++ b/mlinux/moal_pcie.c
+@@ -554,6 +554,49 @@ err_init_fw:
+ }
+ #endif
+ 
++#if defined(PCIE9097) && LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
++static int ps5_fresh_fw = 1;
++module_param(ps5_fresh_fw, int, 0444);
++MODULE_PARM_DESC(ps5_fresh_fw,
++		 "1: Reset IW620 at probe if firmware is already running (default); 0: Reuse running firmware");
++
++/**
++ *  @brief This function resets the IW620 function if firmware left by an
++ *  earlier kernel is still running, so that probe downloads it fresh.
++ *  A cold boot is left alone, which keeps the chip Bluetooth up.
++ *
++ *  @param pdev     A pointer to pci_dev structure
++ *
++ *  @return         N/A
++ */
++static void woal_pcie_fresh_fw(struct pci_dev *pdev)
++{
++	void __iomem *reg;
++	u32 status = 0;
++
++	if (!ps5_fresh_fw || pdev->device != PCIE_DEVICE_ID_88W9097)
++		return;
++	if (pci_enable_device(pdev))
++		return;
++	/* PCIE9098_SCRATCH_3_REG in BAR 2, as polled by mlan */
++	reg = pci_iomap_range(pdev, 2, 0x1C6C, sizeof(u32));
++	if (reg) {
++		status = ioread32(reg);
++		pci_iounmap(pdev, reg);
++	}
++	pci_disable_device(pdev);
++	/* PCIE_FIRMWARE_READY, or all ones if the chip does not respond */
++	if (status != 0xfedcba00 && status != 0xffffffff)
++		return;
++	PRINTM(MMSG, "Firmware status 0x%08x at probe, reset function\n",
++	       status);
++	pci_save_state(pdev);
++	if (pcie_reset_flr(pdev, PCI_RESET_DO_RESET))
++		PRINTM(MERROR, "Function reset failed\n");
++	pci_restore_state(pdev);
++}
++#endif
++
+ /**
+  *  @brief This function handles PCIE driver probe
+  *
+@@ -573,6 +616,9 @@ static int woal_pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 	PRINTM(MINFO, "vendor=0x%4.04X device=0x%4.04X rev=%d\n", pdev->vendor,
+ 	       pdev->device, pdev->revision);
+ 
++#if defined(PCIE9097) && LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
++	woal_pcie_fresh_fw(pdev);
++#endif
+ 	/* Preinit PCIE device so allocate PCIE memory can be successful */
+ 	if (woal_pcie_preinit(pdev)) {
+ 		PRINTM(MFATAL, "MOAL PCIE preinit failed\n");
+diff --git a/mlinux/moal_sta_cfg80211.c b/mlinux/moal_sta_cfg80211.c
+index dd1739f..03a237c 100644
+--- a/mlinux/moal_sta_cfg80211.c
++++ b/mlinux/moal_sta_cfg80211.c
+@@ -3999,7 +3999,19 @@ done:
+ 
+ 	spin_lock_irqsave(&priv->connect_lock, flags);
+ 	priv->cfg_connect = MFALSE;
+-	if (!ret && priv->media_connected) {
++	if (!ret && priv->media_connected &&
++	    !ssid_bssid->assoc_rsp.assoc_resp_len) {
++		/* cfg80211 cannot complete without the response */
++		spin_unlock_irqrestore(&priv->connect_lock, flags);
++		PRINTM(MERROR,
++		       "wlan: HostMlme %s no association response from bssid " MACSTR
++		       "\n",
++		       priv->netdev->name, MAC2STR(priv->cfg_bssid));
++		woal_disconnect(priv, MOAL_IOCTL_WAIT_TIMEOUT, priv->cfg_bssid,
++				DEF_DEAUTH_REASON_CODE);
++		woal_assoc_timeout_event(priv, req);
++		ret = 0;
++	} else if (!ret && priv->media_connected) {
+ 		PRINTM(MMSG,
+ 		       "wlan: HostMlme %s Connected to bssid " MACSTR
+ 		       " successfully\n",

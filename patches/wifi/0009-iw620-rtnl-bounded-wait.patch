@@ -1,0 +1,52 @@
+diff --git a/mlinux/moal_sta_cfg80211.c b/mlinux/moal_sta_cfg80211.c
+index 05e820f..0d5942c 100644
+--- a/mlinux/moal_sta_cfg80211.c
++++ b/mlinux/moal_sta_cfg80211.c
+@@ -4675,10 +4675,17 @@ static mlan_status woal_cfg80211_dump_station_info(moal_private *priv,
+ 	sinfo->filled |= MBIT64(NL80211_STA_INFO_FCS_ERROR_COUNT);
+ #endif
+ 
++	/* Every firmware round-trip below runs while cfg80211 holds the wiphy
++	 * mutex, and nl80211_pre_doit() takes RTNL before that. MOAL_IOCTL_WAIT
++	 * has no timeout, so a firmware that stops answering strands RTNL and
++	 * every network-touching syscall on the machine blocks in D state.
++	 * MOAL_IOCTL_WAIT_TIMEOUT bounds each one at MOAL_IOCTL_TIMEOUT (20s).
++	 */
++
+ 	/* Get signal information from the firmware */
+ 	memset(&signal, 0, sizeof(mlan_ds_get_signal));
+ 	if (MLAN_STATUS_SUCCESS !=
+-	    woal_get_signal_info(priv, MOAL_IOCTL_WAIT, &signal)) {
++	    woal_get_signal_info(priv, MOAL_IOCTL_WAIT_TIMEOUT, &signal)) {
+ 		PRINTM(MERROR, "Error getting signal information\n");
+ 		ret = MLAN_STATUS_FAILURE;
+ 		goto done;
+@@ -4687,7 +4694,7 @@ static mlan_status woal_cfg80211_dump_station_info(moal_private *priv,
+ 	/* Get stats information from the firmware */
+ 	memset(&stats, 0, sizeof(mlan_ds_get_stats));
+ 	if (MLAN_STATUS_SUCCESS !=
+-	    woal_get_stats_info(priv, MOAL_IOCTL_WAIT, &stats)) {
++	    woal_get_stats_info(priv, MOAL_IOCTL_WAIT_TIMEOUT, &stats)) {
+ 		PRINTM(MERROR, "Error getting stats information\n");
+ 		ret = MLAN_STATUS_FAILURE;
+ 		goto done;
+@@ -4717,7 +4724,7 @@ static mlan_status woal_cfg80211_dump_station_info(moal_private *priv,
+ 	sinfo->filled |= STATION_INFO_BSS_PARAM;
+ #endif
+ 	sinfo->bss_param.flags = 0;
+-	ret = woal_get_bss_info(priv, MOAL_IOCTL_WAIT, &bss_info);
++	ret = woal_get_bss_info(priv, MOAL_IOCTL_WAIT_TIMEOUT, &bss_info);
+ 	if (ret)
+ 		goto done;
+ 	if (bss_info.capability_info & WLAN_CAPABILITY_SHORT_PREAMBLE)
+@@ -4726,8 +4733,8 @@ static mlan_status woal_cfg80211_dump_station_info(moal_private *priv,
+ 		sinfo->bss_param.flags |= BSS_PARAM_FLAGS_SHORT_SLOT_TIME;
+ 	sinfo->bss_param.beacon_interval = bss_info.beacon_interval;
+ 	/* Get DTIM period */
+-	ret = woal_set_get_dtim_period(priv, MLAN_ACT_GET, MOAL_IOCTL_WAIT,
+-				       &dtim_period);
++	ret = woal_set_get_dtim_period(priv, MLAN_ACT_GET,
++				       MOAL_IOCTL_WAIT_TIMEOUT, &dtim_period);
+ 	if (ret) {
+ 		PRINTM(MERROR, "Get DTIM period failed\n");
+ 		goto done;

@@ -1,0 +1,46 @@
+diff --git a/mlinux/moal_main.c b/mlinux/moal_main.c
+--- a/mlinux/moal_main.c
++++ b/mlinux/moal_main.c
+@@ -5232,6 +5232,26 @@
+ 	return ret;
+ }
+ 
++static t_u32 woal_iw620_tx_priority(moal_private *priv, t_u32 priority)
++{
++#if defined(PCIE) && defined(PCIE9097)
++	/* Short packets at TIDs 1, 3 and 5 can stall IW620 STA firmware
++	 * while the paired TID has an active BA stream. Use one TID per
++	 * affected access category before queue selection and BA bookkeeping.
++	 */
++	if (IS_PCIE9097(priv->phandle->card_type) &&
++	    priv->bss_type == MLAN_BSS_TYPE_STA) {
++		if (priority == 1)
++			return 2;
++		if (priority == 3)
++			return 0;
++		if (priority == 5)
++			return 4;
++	}
++#endif
++	return priority;
++}
++
+ /**
+  *  @brief This function will fill in the mlan_buffer
+  *
+@@ -5343,6 +5363,7 @@
+ #endif
+ 	pmbuf->data_offset = skb->data - (skb->head + sizeof(mlan_buffer));
+ 	pmbuf->data_len = skb->len;
++	skb->priority = woal_iw620_tx_priority(priv, skb->priority);
+ 	pmbuf->priority = skb->priority;
+ 	pmbuf->buf_type = 0;
+ 	pmbuf->in_ts_sec = (t_u32)ts.tv_sec;
+@@ -8125,6 +8146,7 @@
+ 		tid = skb->priority = 7;
+ 		break;
+ 	}
++	tid = skb->priority = woal_iw620_tx_priority(priv, tid);
+ 	index = mlan_select_wmm_queue(priv->phandle->pmlan_adapter,
+ 				      priv->bss_index, tid);
+ 	PRINTM(MDATA, "select queue: tid=%d, index=%d\n", tid, index);

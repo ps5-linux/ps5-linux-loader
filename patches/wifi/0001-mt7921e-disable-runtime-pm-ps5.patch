@@ -1,0 +1,48 @@
+From: PS5 Linux Kernel Team <kernel@ps5-linux.local>
+Subject: [PATCH 1/13] mt7921e: disable runtime PM and deep sleep on PS5 Salina southbridge
+
+Sony Salina southbridge does not implement PCIe ASPM L1.1/L1.2 substate
+handshaking. When MT7921 enters runtime PM or deep sleep, the Salina
+interconnect drops power and clocks to the endpoint, returning 0xffffffff
+on subsequent MMIO accesses. This cascades into xHCI host controller failure
+and triggers a PMIC hard power shutdown approximately 20 seconds after boot.
+
+Gate dev->pm.enable, dev->pm.ds_enable, and their user counterparts on
+!IS_ENABLED(CONFIG_X86_PS5) to keep the MT7921 chip fully in D0 state.
+
+Signed-off-by: PS5 Linux Kernel Team <kernel@ps5-linux.local>
+---
+ drivers/net/wireless/mediatek/mt76/mt7921/init.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/drivers/net/wireless/mediatek/mt76/mt7921/init.c b/drivers/net/wireless/mediatek/mt76/mt7921/init.c
+index a41bc8f..d79a25b 100644
+--- a/drivers/net/wireless/mediatek/mt76/mt7921/init.c
++++ b/drivers/net/wireless/mediatek/mt76/mt7921/init.c
+@@ -209,12 +209,24 @@ int mt7921_register_device(struct mt792x_dev *dev)
+ 	dev->pm.stats.last_wake_event = jiffies;
+ 	dev->pm.stats.last_doze_event = jiffies;
+ 
+ 	if (!mt76_is_usb(&dev->mt76) &&
+ 	    !is_mt7902(&dev->mt76)) {
++#if IS_ENABLED(CONFIG_X86_PS5)
++		/*
++		 * Sony Salina Southbridge drops PCIe interconnect clock/power when MT7921
++		 * enters runtime PM or deep sleep, causing bus read 0xffffffff and hard
++		 * console power shutdown ~20s after boot. Keep MT7921 fully in D0.
++		 */
++		dev->pm.enable_user = false;
++		dev->pm.enable = false;
++		dev->pm.ds_enable_user = false;
++		dev->pm.ds_enable = false;
++#else
+ 		dev->pm.enable_user = true;
+ 		dev->pm.enable = true;
+ 		dev->pm.ds_enable_user = true;
+ 		dev->pm.ds_enable = true;
++#endif
+ 	}
+ 
+ 	if (!mt76_is_mmio(&dev->mt76))
+-- 
+2.43.0

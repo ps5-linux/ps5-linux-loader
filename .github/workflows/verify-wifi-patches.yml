@@ -1,0 +1,515 @@
+name: PlayStation 5 Wi-Fi Driver Build Matrix & Verification Suite
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'patches/wifi/**'
+      - '.github/workflows/verify-wifi-patches.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'patches/wifi/**'
+      - '.github/workflows/verify-wifi-patches.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-validation:
+    name: Job 1 - Static Analysis & Patch Integrity Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Deep Static & Syntax Verification Suite
+        run: |
+          cd patches/wifi
+          python3 verify_patches.py
+
+  patch-applicability-matrix:
+    name: Job 2 - Patch Applicability Matrix Dry-Run (${{ matrix.target_kernel_version }})
+    needs: static-validation
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target_kernel_version: '7.1.7'
+            linux_commit: '8cd9520d35a6c38db6567e97dd93b1f11f185dc6'
+          - target_kernel_version: '7.2.3'
+            linux_commit: '8d3ae59288f1e7d58d76558a6ee96d533bc5019f'
+          - target_kernel_version: '7.3.1'
+            linux_commit: 'c03c1a14507dfaf8b856c2608f9ac216021fc222'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Test Kernel Tree for MT7921 Patches
+        run: |
+          mkdir -p /tmp/kernel-tree
+          cd /tmp/kernel-tree
+          git init
+          git remote add origin https://github.com/torvalds/linux.git
+          git config core.sparseCheckout true
+          echo "drivers/net/wireless/mediatek/mt76/" >> .git/info/sparse-checkout
+          echo "arch/x86/configs/" >> .git/info/sparse-checkout
+          git fetch --depth 1 origin ${{ matrix.linux_commit }}
+          git checkout FETCH_HEAD
+          curl -fsSL https://raw.githubusercontent.com/ps5-linux/ps5-linux-patches/149608631392c05ebef123f263df6ad7d51c7574/.config -o arch/x86/configs/ps5_defconfig
+          git add arch/x86/configs/ps5_defconfig
+          git config user.name "CI Validator"
+          git config user.email "ci@ps5-linux.local"
+          git commit -m "Initialize baseline MT7921 kernel tree with defconfig"
+
+      - name: Prepare Baseline mwifiex Tree for IW620 Patches (Pinned Commit)
+        run: |
+          mkdir -p /tmp/mwifiex-tree
+          cd /tmp/mwifiex-tree
+          git init
+          git remote add origin https://github.com/nxp-imx/mwifiex.git
+          git fetch --depth 1 origin a5fe4e194bf99315e349d81d77d6dfacec70757a
+          git checkout FETCH_HEAD
+
+      - name: Run Sequential Dry-Run Applicator
+        run: |
+          chmod +x patches/wifi/apply_patches.sh
+          ./patches/wifi/apply_patches.sh --dry-run --target-kernel-version ${{ matrix.target_kernel_version }} --kernel-dir /tmp/kernel-tree --mwifiex-dir /tmp/mwifiex-tree
+
+  iw620-build-matrix:
+    name: Job 3 - IW620 Build Matrix (${{ matrix.kernel_version }})
+    needs: patch-applicability-matrix
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kernel_version: '7.1.7'
+            linux_commit: '8cd9520d35a6c38db6567e97dd93b1f11f185dc6'
+            release_tag: 'kernel-7.1.7-56922cf'
+            deb_name: 'linux-ps5_7.1.7_amd64.deb'
+            sha256: '81da2aa82011dadd0c96a6aff564fffc472b100f8972a6fcab9e9bc75d9bf768'
+          - kernel_version: '7.2.3'
+            linux_commit: '8d3ae59288f1e7d58d76558a6ee96d533bc5019f'
+            release_tag: 'kernel-7.2.3-5f6b5d3'
+            deb_name: 'linux-ps5_7.2.3_amd64.deb'
+            sha256: '1a4ccf467412c36851d6f6e52cb094c95048b7ab167448d77a939c9f0fcdaf11'
+          - kernel_version: '7.3.1'
+            linux_commit: 'c03c1a14507dfaf8b856c2608f9ac216021fc222'
+            release_tag: 'kernel-7.3.1-1496086'
+            deb_name: 'linux-ps5_7.3.1_amd64.deb'
+            sha256: '95e42a3d8f354decaea1367c07aab41a1af5004ce7b6237effb368327780df6f'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Toolchain & Build Prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libdw-dev elfutils pahole libelf-dev bc bison flex libssl-dev
+
+      - name: Download & Verify Official PS5 Kernel Package
+        run: |
+          DEB_URL="https://github.com/ps5-linux/ps5-linux-patches/releases/download/${{ matrix.release_tag }}/${{ matrix.deb_name }}"
+          curl -fsSL "$DEB_URL" -o "${{ matrix.deb_name }}"
+          echo "${{ matrix.sha256 }}  ${{ matrix.deb_name }}" | sha256sum -c --strict -
+
+      - name: Extract PS5 Headers & Initialize Kernel Build Tree
+        run: |
+          mkdir -p /tmp/ps5-headers
+          dpkg-deb -x "${{ matrix.deb_name }}" /tmp/ps5-headers
+          KERNEL_BUILD_DIR="/tmp/ps5-headers/usr/lib/modules/${{ matrix.kernel_version }}/build"
+          test -d "$KERNEL_BUILD_DIR"
+          test -f "$KERNEL_BUILD_DIR/Makefile"
+          test -f "$KERNEL_BUILD_DIR/Module.symvers"
+
+          if [ -f "/tmp/ps5-headers/boot/config-${{ matrix.kernel_version }}" ] && [ ! -f "$KERNEL_BUILD_DIR/.config" ]; then
+              cp "/tmp/ps5-headers/boot/config-${{ matrix.kernel_version }}" "$KERNEL_BUILD_DIR/.config"
+              touch -d "2020-01-01" "$KERNEL_BUILD_DIR/.config"
+          fi
+
+      - name: Build Native Objtool (Eliminates Stub Bypass)
+        run: |
+          KERNEL_BUILD_DIR="/tmp/ps5-headers/usr/lib/modules/${{ matrix.kernel_version }}/build"
+          mkdir -p /tmp/linux-objtool
+          cd /tmp/linux-objtool
+          git init
+          git remote add origin https://github.com/torvalds/linux.git
+          git config core.sparseCheckout true
+          echo "tools/" >> .git/info/sparse-checkout
+          echo "arch/x86/" >> .git/info/sparse-checkout
+          echo "include/" >> .git/info/sparse-checkout
+          echo "scripts/" >> .git/info/sparse-checkout
+          echo "Makefile" >> .git/info/sparse-checkout
+          git fetch --depth 1 origin ${{ matrix.linux_commit }}
+          git checkout FETCH_HEAD
+          make -C tools/objtool -j$(nproc)
+          mkdir -p "$KERNEL_BUILD_DIR/tools/objtool"
+          cp tools/objtool/objtool "$KERNEL_BUILD_DIR/tools/objtool/objtool"
+          chmod +x "$KERNEL_BUILD_DIR/tools/objtool/objtool"
+          file "$KERNEL_BUILD_DIR/tools/objtool/objtool"
+          "$KERNEL_BUILD_DIR/tools/objtool/objtool" --version || true
+
+      - name: Clone Baseline mwifiex Source Tree (Pinned Commit)
+        run: |
+          mkdir -p /tmp/mwifiex-build
+          cd /tmp/mwifiex-build
+          git init
+          git remote add origin https://github.com/nxp-imx/mwifiex.git
+          git fetch --depth 1 origin a5fe4e194bf99315e349d81d77d6dfacec70757a
+          git checkout FETCH_HEAD
+
+      - name: Apply IW620 Patches for Target Kernel
+        run: |
+          chmod +x patches/wifi/apply_patches.sh
+          ./patches/wifi/apply_patches.sh --target-kernel-version ${{ matrix.kernel_version }} --mwifiex-dir /tmp/mwifiex-build
+
+      - name: Build IW620 Modules (mlan.ko & moal.ko)
+        run: |
+          KERNEL_BUILD_DIR="/tmp/ps5-headers/usr/lib/modules/${{ matrix.kernel_version }}/build"
+          make -C /tmp/mwifiex-build PWD=/tmp/mwifiex-build KERNELDIR="$KERNEL_BUILD_DIR" ARCH=x86 -j$(nproc)
+          test -f /tmp/mwifiex-build/mlan.ko
+          test -f /tmp/mwifiex-build/moal.ko
+
+      - name: Validate Module ABI & Symbol CRCs
+        run: |
+          KERNEL_BUILD_DIR="/tmp/ps5-headers/usr/lib/modules/${{ matrix.kernel_version }}/build"
+          python3 patches/wifi/validate_abi_crc.py \
+            -m /tmp/mwifiex-build/mlan.ko /tmp/mwifiex-build/moal.ko \
+            -s "$KERNEL_BUILD_DIR/Module.symvers" \
+            -k "${{ matrix.kernel_version }}" \
+            -c "$KERNEL_BUILD_DIR/.config" \
+            --peer-module /tmp/mwifiex-build/mlan.ko \
+            -v
+
+      - name: Stage IW620 Artifacts
+        run: |
+          STAGE_DIR="/tmp/stage-iw620-${{ matrix.kernel_version }}"
+          mkdir -p "$STAGE_DIR"
+          cp /tmp/mwifiex-build/mlan.ko /tmp/mwifiex-build/moal.ko "$STAGE_DIR/"
+          cd "$STAGE_DIR"
+          sha256sum mlan.ko moal.ko > SHA256SUMS
+
+      - name: Upload IW620 Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps5-iw620-modules-${{ matrix.kernel_version }}
+          path: /tmp/stage-iw620-${{ matrix.kernel_version }}
+          retention-days: 14
+
+  mt7921-build:
+    name: Job 4 - MT7921 Build Matrix (${{ matrix.kernel_version }})
+    needs: patch-applicability-matrix
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kernel_version: '7.2.3'
+            linux_commit: '8d3ae59288f1e7d58d76558a6ee96d533bc5019f'
+            release_tag: 'kernel-7.2.3-5f6b5d3'
+            deb_name: 'linux-ps5_7.2.3_amd64.deb'
+            sha256: '1a4ccf467412c36851d6f6e52cb094c95048b7ab167448d77a939c9f0fcdaf11'
+          - kernel_version: '7.3.1'
+            linux_commit: 'c03c1a14507dfaf8b856c2608f9ac216021fc222'
+            release_tag: 'kernel-7.3.1-1496086'
+            deb_name: 'linux-ps5_7.3.1_amd64.deb'
+            sha256: '95e42a3d8f354decaea1367c07aab41a1af5004ce7b6237effb368327780df6f'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Toolchain & Build Prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libdw-dev elfutils pahole libelf-dev bc bison flex libssl-dev
+
+      - name: Download & Verify Official PS5 Kernel Package
+        run: |
+          DEB_URL="https://github.com/ps5-linux/ps5-linux-patches/releases/download/${{ matrix.release_tag }}/${{ matrix.deb_name }}"
+          curl -fsSL "$DEB_URL" -o "${{ matrix.deb_name }}"
+          echo "${{ matrix.sha256 }}  ${{ matrix.deb_name }}" | sha256sum -c --strict -
+
+      - name: Extract PS5 Headers & Initialize Kernel Build Tree
+        run: |
+          mkdir -p /tmp/ps5-headers
+          dpkg-deb -x "${{ matrix.deb_name }}" /tmp/ps5-headers
+          KERNEL_BUILD_DIR="/tmp/ps5-headers/usr/lib/modules/${{ matrix.kernel_version }}/build"
+          test -d "$KERNEL_BUILD_DIR"
+          test -f "$KERNEL_BUILD_DIR/Makefile"
+          test -f "$KERNEL_BUILD_DIR/Module.symvers"
+
+          if [ -f "/tmp/ps5-headers/boot/config-${{ matrix.kernel_version }}" ] && [ ! -f "$KERNEL_BUILD_DIR/.config" ]; then
+              cp "/tmp/ps5-headers/boot/config-${{ matrix.kernel_version }}" "$KERNEL_BUILD_DIR/.config"
+              touch -d "2020-01-01" "$KERNEL_BUILD_DIR/.config"
+          fi
+
+      - name: Clone Pinned Linux Source Tree (Sparse Checkout)
+        run: |
+          mkdir -p /tmp/linux-tree
+          cd /tmp/linux-tree
+          git init
+          git remote add origin https://github.com/torvalds/linux.git
+          git config core.sparseCheckout true
+          echo "drivers/net/wireless/mediatek/mt76/" >> .git/info/sparse-checkout
+          echo "tools/" >> .git/info/sparse-checkout
+          echo "arch/x86/" >> .git/info/sparse-checkout
+          echo "include/" >> .git/info/sparse-checkout
+          echo "scripts/" >> .git/info/sparse-checkout
+          echo "Makefile" >> .git/info/sparse-checkout
+          git fetch --depth 1 origin ${{ matrix.linux_commit }}
+          git checkout FETCH_HEAD
+
+      - name: Build Native Objtool (Eliminates Stub Bypass)
+        run: |
+          KERNEL_BUILD_DIR="/tmp/ps5-headers/usr/lib/modules/${{ matrix.kernel_version }}/build"
+          make -C /tmp/linux-tree/tools/objtool -j$(nproc)
+          mkdir -p "$KERNEL_BUILD_DIR/tools/objtool"
+          cp /tmp/linux-tree/tools/objtool/objtool "$KERNEL_BUILD_DIR/tools/objtool/objtool"
+          chmod +x "$KERNEL_BUILD_DIR/tools/objtool/objtool"
+          file "$KERNEL_BUILD_DIR/tools/objtool/objtool"
+
+      - name: Apply MT7921 Patches 0001 & 0002
+        run: |
+          cd /tmp/linux-tree
+          patch -p1 < "${{ github.workspace }}/patches/wifi/0001-mt7921e-disable-runtime-pm-ps5.patch"
+          patch -p1 < "${{ github.workspace }}/patches/wifi/0002-mt7921e-pcie-reset-quirk.patch"
+
+      - name: Build MT7921 Modules (mt7921-common.ko & mt7921e.ko)
+        run: |
+          KERNEL_BUILD_DIR="/tmp/ps5-headers/usr/lib/modules/${{ matrix.kernel_version }}/build"
+          make -C "$KERNEL_BUILD_DIR" \
+               M=/tmp/linux-tree/drivers/net/wireless/mediatek/mt76/mt7921 \
+               CONFIG_MT7921_COMMON=m \
+               CONFIG_MT7921E=m \
+               ARCH=x86 \
+               -j$(nproc) modules
+          test -f /tmp/linux-tree/drivers/net/wireless/mediatek/mt76/mt7921/mt7921-common.ko
+          test -f /tmp/linux-tree/drivers/net/wireless/mediatek/mt76/mt7921/mt7921e.ko
+
+      - name: Validate Module ABI & Symbol CRCs
+        run: |
+          KERNEL_BUILD_DIR="/tmp/ps5-headers/usr/lib/modules/${{ matrix.kernel_version }}/build"
+          python3 patches/wifi/validate_abi_crc.py \
+            -m /tmp/linux-tree/drivers/net/wireless/mediatek/mt76/mt7921/mt7921-common.ko \
+               /tmp/linux-tree/drivers/net/wireless/mediatek/mt76/mt7921/mt7921e.ko \
+            -s "$KERNEL_BUILD_DIR/Module.symvers" \
+            -k "${{ matrix.kernel_version }}" \
+            -c "$KERNEL_BUILD_DIR/.config" \
+            --peer-module /tmp/linux-tree/drivers/net/wireless/mediatek/mt76/mt7921/mt7921-common.ko \
+            -v
+
+      - name: Stage MT7921 Artifacts
+        run: |
+          STAGE_DIR="/tmp/stage-mt7921-${{ matrix.kernel_version }}"
+          mkdir -p "$STAGE_DIR"
+          cp /tmp/linux-tree/drivers/net/wireless/mediatek/mt76/mt7921/mt7921-common.ko /tmp/linux-tree/drivers/net/wireless/mediatek/mt76/mt7921/mt7921e.ko "$STAGE_DIR/"
+          cd "$STAGE_DIR"
+          sha256sum mt7921-common.ko mt7921e.ko > SHA256SUMS
+
+      - name: Upload MT7921 Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps5-mt7921-modules-${{ matrix.kernel_version }}
+          path: /tmp/stage-mt7921-${{ matrix.kernel_version }}
+          retention-days: 14
+
+  artifact-validation:
+    name: Job 5 - Release Package Assembly, Adversarial Testing & Provenance
+    needs: [iw620-build-matrix, mt7921-build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Validation Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y kmod binutils
+
+      - name: Download All Built Module Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/all-artifacts
+
+      - name: Download PS5 7.2.3 Headers for Adversarial Negative Testing
+        run: |
+          curl -fsSL "https://github.com/ps5-linux/ps5-linux-patches/releases/download/kernel-7.2.3-5f6b5d3/linux-ps5_7.2.3_amd64.deb" -o /tmp/ps5_723.deb
+          mkdir -p /tmp/ps5-headers-723
+          dpkg-deb -x /tmp/ps5_723.deb /tmp/ps5-headers-723
+
+      - name: Execute Adversarial Negative Test Suite
+        run: |
+          echo "Running 10 deliberate corruption tests to verify validator hard-fail guarantee..."
+          python3 patches/wifi/validate_abi_crc.py \
+            -m /tmp/all-artifacts/ps5-iw620-modules-7.2.3/mlan.ko \
+            -s /tmp/ps5-headers-723/usr/lib/modules/7.2.3/build/Module.symvers \
+            -k 7.2.3 \
+            --test-adversarial
+
+      - name: Assemble Release Package Tree
+        run: |
+          RELEASE_ROOT="/tmp/release-package"
+          mkdir -p "$RELEASE_ROOT/7.1.7/iw620"
+          mkdir -p "$RELEASE_ROOT/7.1.7/mt7921"
+          mkdir -p "$RELEASE_ROOT/7.2.3/iw620"
+          mkdir -p "$RELEASE_ROOT/7.2.3/mt7921"
+          mkdir -p "$RELEASE_ROOT/7.3.1/iw620"
+          mkdir -p "$RELEASE_ROOT/7.3.1/mt7921"
+          mkdir -p "$RELEASE_ROOT/firmware"
+
+          # 7.1.7
+          cp /tmp/all-artifacts/ps5-iw620-modules-7.1.7/*.ko "$RELEASE_ROOT/7.1.7/iw620/"
+          cd "$RELEASE_ROOT/7.1.7/iw620" && sha256sum *.ko > SHA256SUMS && cd -
+          cp patches/wifi/UNSUPPORTED_NOTE.md "$RELEASE_ROOT/7.1.7/mt7921/"
+
+          # 7.2.3
+          cp /tmp/all-artifacts/ps5-iw620-modules-7.2.3/*.ko "$RELEASE_ROOT/7.2.3/iw620/"
+          cd "$RELEASE_ROOT/7.2.3/iw620" && sha256sum *.ko > SHA256SUMS && cd -
+          cp /tmp/all-artifacts/ps5-mt7921-modules-7.2.3/*.ko "$RELEASE_ROOT/7.2.3/mt7921/"
+          cd "$RELEASE_ROOT/7.2.3/mt7921" && sha256sum *.ko > SHA256SUMS && cd -
+
+          # 7.3.1
+          cp /tmp/all-artifacts/ps5-iw620-modules-7.3.1/*.ko "$RELEASE_ROOT/7.3.1/iw620/"
+          cd "$RELEASE_ROOT/7.3.1/iw620" && sha256sum *.ko > SHA256SUMS && cd -
+          cp /tmp/all-artifacts/ps5-mt7921-modules-7.3.1/*.ko "$RELEASE_ROOT/7.3.1/mt7921/"
+          cd "$RELEASE_ROOT/7.3.1/mt7921" && sha256sum *.ko > SHA256SUMS && cd -
+
+          # Docs & Guides
+          cp patches/wifi/FIRMWARE_GUIDE.md "$RELEASE_ROOT/firmware/"
+          cp patches/wifi/BUILD_REPORT.md "$RELEASE_ROOT/"
+          cp patches/wifi/INSTALL.md "$RELEASE_ROOT/"
+          cp patches/wifi/TESTING.md "$RELEASE_ROOT/"
+
+      - name: Generate Manifest and Provenance Metadata
+        run: |
+          python3 - << 'EOF'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          import sys
+
+          package_root = "/tmp/release-package"
+          expected_targets = {
+              "7.1.7": [("iw620", "mlan.ko"), ("iw620", "moal.ko")],
+              "7.2.3": [("iw620", "mlan.ko"), ("iw620", "moal.ko"), ("mt7921", "mt7921-common.ko"), ("mt7921", "mt7921e.ko")],
+              "7.3.1": [("iw620", "mlan.ko"), ("iw620", "moal.ko"), ("mt7921", "mt7921-common.ko"), ("mt7921", "mt7921e.ko")],
+          }
+
+          manifest = {
+              "suite": "PlayStation 5 Wi-Fi Driver Artifact Manifest",
+              "provenance": {
+                  "repository": os.environ.get("GITHUB_REPOSITORY", "unknown"),
+                  "commit_sha": os.environ.get("GITHUB_SHA", "unknown"),
+                  "ref": os.environ.get("GITHUB_REF", "unknown"),
+                  "run_id": os.environ.get("GITHUB_RUN_ID", "unknown"),
+                  "toolchain": {
+                      "native_objtool": "COMPILED_FROM_PINNED_LINUX_SOURCE",
+                      "objtool_bypass_removed": True,
+                      "pinned_mwifiex_sha": "a5fe4e194bf99315e349d81d77d6dfacec70757a"
+                  }
+              },
+              "targets": {},
+              "validation_status": "PENDING"
+          }
+
+          errors = []
+
+          print("=== PlayStation 5 Wi-Fi Module Artifact & Provenance Validation ===")
+
+          for kernel, expected_files in expected_targets.items():
+              manifest["targets"][kernel] = {
+                  "target_kernel": kernel,
+                  "modules": {}
+              }
+
+              for subfolder, fname in expected_files:
+                  mod_path = os.path.join(package_root, kernel, subfolder, fname)
+                  if not os.path.isfile(mod_path):
+                      errors.append(f"Missing required artifact: {kernel}/{subfolder}/{fname}")
+                      continue
+
+                  # Calculate SHA-256
+                  sha256 = hashlib.sha256()
+                  with open(mod_path, "rb") as f:
+                      while chunk := f.read(65536):
+                          sha256.update(chunk)
+                  digest = sha256.hexdigest()
+
+                  # Verify vermagic
+                  proc_vm = subprocess.run(["modinfo", "-F", "vermagic", mod_path], capture_output=True, text=True)
+                  vermagic = proc_vm.stdout.strip()
+                  if not vermagic.startswith(kernel):
+                      errors.append(f"Vermagic mismatch for {kernel}/{subfolder}/{fname}: expected '{kernel}...', got '{vermagic}'")
+                  if "modversions" not in vermagic:
+                      errors.append(f"Missing modversions flag in vermagic for {kernel}/{subfolder}/{fname}: '{vermagic}'")
+
+                  # Extract dependencies
+                  proc_dep = subprocess.run(["modinfo", "-F", "depends", mod_path], capture_output=True, text=True)
+                  depends = [d for d in proc_dep.stdout.strip().split(",") if d]
+
+                  manifest["targets"][kernel]["modules"][fname] = {
+                      "driver": subfolder,
+                      "sha256": digest,
+                      "vermagic": vermagic,
+                      "depends": depends,
+                      "status": "VERIFIED"
+                  }
+
+                  print(f"[PASS] {kernel}/{subfolder}/{fname}:")
+                  print(f"       SHA256:   {digest}")
+                  print(f"       Vermagic: {vermagic}")
+                  print(f"       Depends:  {depends}")
+
+          if errors:
+              print("\n[FAILURE] Artifact Validation Errors:")
+              for err in errors:
+                  print(f"  - {err}")
+              manifest["validation_status"] = "FAILED"
+              manifest["errors"] = errors
+              with open(os.path.join(package_root, "manifest.json"), "w", encoding="utf-8") as f:
+                  json.dump(manifest, f, indent=2)
+              sys.exit(1)
+
+          manifest["validation_status"] = "SUCCESS"
+          manifest_path = os.path.join(package_root, "manifest.json")
+          with open(manifest_path, "w", encoding="utf-8") as f:
+              json.dump(manifest, f, indent=2)
+
+          print("\n[SUCCESS] All kernel module artifacts successfully validated against ABI, vermagic, and provenance criteria.")
+          print(f"Manifest written to: {manifest_path}")
+          EOF
+
+      - name: Generate Master Checksum Manifest
+        run: |
+          cd /tmp/release-package
+          find . -type f -exec sha256sum {} + | sort -k2 > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload Validated Driver Release Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps5-wifi-drivers-verified-package
+          path: /tmp/release-package
+          retention-days: 14
