@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# PlayStation 5 Wi-Fi Driver Patch Applicator (v4)
+# PlayStation 5 Wi-Fi Driver Patch Applicator (v5)
 # Applies in-tree MT7921e patches (0001-0003) and out-of-tree IW620 patches (0004-0013)
 # Supports dual-mode target kernel selection (Kernel 6.x vs Kernel 7.x)
 # ==============================================================================
@@ -68,7 +68,7 @@ if [[ -z "${KERNEL_DIR}" && -z "${MWIFIEX_DIR}" ]]; then
     usage
 fi
 
-echo "=== PlayStation 5 Wi-Fi Driver Patch Applicator (v4) ==="
+echo "=== PlayStation 5 Wi-Fi Driver Patch Applicator (v5) ==="
 echo "Suite directory: ${SCRIPT_DIR}"
 echo "Target kernel generation: ${TARGET_KERNEL}"
 
@@ -106,13 +106,19 @@ else
 fi
 
 apply_sequential_chain() {
-    local base_dir="$1"
-    local patches=("${@:2}")
+    local target_type="$1"
+    local base_dir="$2"
+    local patches=("${@:3}")
     local work_dir="${base_dir}"
 
     if [[ ${DRY_RUN} -eq 1 ]]; then
         local temp_dir
         temp_dir="$(mktemp -d)"
+        if [[ "${target_type}" == "kernel" ]]; then
+            TEMP_KERNEL_DIR="${temp_dir}"
+        else
+            TEMP_MWIFIEX_DIR="${temp_dir}"
+        fi
         echo "--> [DRY-RUN] Creating temporary workspace at ${temp_dir}..."
         cp -a "${base_dir}/." "${temp_dir}/"
         work_dir="${temp_dir}"
@@ -128,7 +134,7 @@ apply_sequential_chain() {
 
         echo "    Applying ${patch_name}..."
 
-        # Idempotent defconfig check for MT7921E
+        # Idempotent defconfig check for all 3 MT7921 symbols
         if [[ "${patch_name}" == "0003-ps5-defconfig-enable-mt7921e.patch" ]]; then
             local cfg_file=""
             if [[ -f "${work_dir}/arch/x86/configs/ps5_defconfig" ]]; then
@@ -136,8 +142,11 @@ apply_sequential_chain() {
             elif [[ -f "${work_dir}/.config" ]]; then
                 cfg_file="${work_dir}/.config"
             fi
-            if [[ -n "${cfg_file}" ]] && grep -q "^CONFIG_MT7921E=m" "${cfg_file}"; then
-                echo "    [INFO] Already enabled: ${patch_name} (CONFIG_MT7921E=m present in ${cfg_file##*/})"
+            if [[ -n "${cfg_file}" ]] && \
+               grep -q "^CONFIG_MT76_CORE=m" "${cfg_file}" && \
+               grep -q "^CONFIG_MT7921_COMMON=m" "${cfg_file}" && \
+               grep -q "^CONFIG_MT7921E=m" "${cfg_file}"; then
+                echo "    [INFO] Already enabled: ${patch_name} (MT76_CORE, MT7921_COMMON, and MT7921E present in ${cfg_file##*/})"
                 continue
             fi
         fi
@@ -154,6 +163,11 @@ apply_sequential_chain() {
 
     if [[ ${DRY_RUN} -eq 1 ]]; then
         rm -rf "${work_dir}"
+        if [[ "${target_type}" == "kernel" ]]; then
+            TEMP_KERNEL_DIR=""
+        else
+            TEMP_MWIFIEX_DIR=""
+        fi
         echo "--> [DRY-RUN] Sequential chain verification succeeded!"
     fi
 }
@@ -165,7 +179,7 @@ if [[ -n "${KERNEL_DIR}" ]]; then
         exit 1
     fi
     echo "--- [Kernel MT7921e] Patch Sequence (0001 - 0003) ---"
-    apply_sequential_chain "${KERNEL_DIR}" "${KERNEL_PATCHES[@]}"
+    apply_sequential_chain "kernel" "${KERNEL_DIR}" "${KERNEL_PATCHES[@]}"
 fi
 
 # 2. Process MWIFIEX Patches
@@ -175,7 +189,7 @@ if [[ -n "${MWIFIEX_DIR}" ]]; then
         exit 1
     fi
     echo "--- [Out-of-Tree IW620] Patch Sequence (Target Kernel ${TARGET_KERNEL}) ---"
-    apply_sequential_chain "${MWIFIEX_DIR}" "${MWIFIEX_PATCHES[@]}"
+    apply_sequential_chain "mwifiex" "${MWIFIEX_DIR}" "${MWIFIEX_PATCHES[@]}"
 fi
 
 echo "=== All patch operations completed successfully. ==="

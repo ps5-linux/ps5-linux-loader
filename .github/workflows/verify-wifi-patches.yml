@@ -15,7 +15,7 @@ on:
 
 jobs:
   verify:
-    name: Deep Patch Verification & Empirical Dual-Kernel Dry-Run
+    name: Deep Patch Verification, Dual-Kernel Dry-Run & Driver Build
     runs-on: ubuntu-latest
 
     steps:
@@ -36,9 +36,9 @@ jobs:
         run: |
           mkdir -p /tmp/kernel-tree/drivers/net/wireless/mediatek/mt76/mt7921
           mkdir -p /tmp/kernel-tree/arch/x86/configs
-          curl -fsSL https://raw.githubusercontent.com/torvalds/linux/master/drivers/net/wireless/mediatek/mt76/mt7921/init.c -o /tmp/kernel-tree/drivers/net/wireless/mediatek/mt76/mt7921/init.c
-          curl -fsSL https://raw.githubusercontent.com/torvalds/linux/master/drivers/net/wireless/mediatek/mt76/mt7921/pci.c -o /tmp/kernel-tree/drivers/net/wireless/mediatek/mt76/mt7921/pci.c
-          curl -fsSL https://raw.githubusercontent.com/ps5-linux/ps5-linux-patches/main/.config -o /tmp/kernel-tree/arch/x86/configs/ps5_defconfig
+          curl -fsSL https://raw.githubusercontent.com/torvalds/linux/7e1392a42ea288d70a266f6553fe06f57f8647ea/drivers/net/wireless/mediatek/mt76/mt7921/init.c -o /tmp/kernel-tree/drivers/net/wireless/mediatek/mt76/mt7921/init.c
+          curl -fsSL https://raw.githubusercontent.com/torvalds/linux/7e1392a42ea288d70a266f6553fe06f57f8647ea/drivers/net/wireless/mediatek/mt76/mt7921/pci.c -o /tmp/kernel-tree/drivers/net/wireless/mediatek/mt76/mt7921/pci.c
+          curl -fsSL https://raw.githubusercontent.com/ps5-linux/ps5-linux-patches/149608631392c05ebef123f263df6ad7d51c7574/.config -o /tmp/kernel-tree/arch/x86/configs/ps5_defconfig
           git -C /tmp/kernel-tree init
           git -C /tmp/kernel-tree config user.name "CI Validator"
           git -C /tmp/kernel-tree config user.email "ci@ps5-linux.local"
@@ -56,4 +56,13 @@ jobs:
 
       - name: Run Sequential Dry-Run Applicator (Target Kernel 6)
         run: |
-          ./patches/wifi/apply_patches.sh --dry-run --target-kernel 6 --mwifiex-dir /tmp/mwifiex-tree
+          ./patches/wifi/apply_patches.sh --dry-run --target-kernel 6 --kernel-dir /tmp/kernel-tree --mwifiex-dir /tmp/mwifiex-tree
+
+      - name: Build Verification - Compile mwifiex Kernel Modules
+        run: |
+          git clone --depth 1 --branch lf-6.18.2_1.0.0 https://github.com/nxp-imx/mwifiex.git /tmp/mwifiex-build
+          ./patches/wifi/apply_patches.sh --target-kernel 6 --mwifiex-dir /tmp/mwifiex-build
+          make -C /tmp/mwifiex-build PWD=/tmp/mwifiex-build KERNELDIR=/lib/modules/$(uname -r)/build ARCH=x86 -j$(nproc)
+          test -f /tmp/mwifiex-build/mlan.ko
+          test -f /tmp/mwifiex-build/moal.ko
+          echo "Empirical Build Verification Succeeded: mlan.ko and moal.ko compiled cleanly!"
