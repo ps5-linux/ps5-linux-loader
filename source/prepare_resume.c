@@ -258,8 +258,8 @@ uint64_t prepare_sck_args(void) {
   args.kernel_cfi_check = ktext + env_offset.KERNEL_CFI_CHECK;
   args.hv_handle_vmexit_pa = env_offset.HV_HANDLE_VMEXIT_PA;
   args.hv_code_cave_pa = env_offset.HV_CODE_CAVE_PA;
-  if ((PS5_FW_IS_11XX(fw) || PS5_FW_IS_12XX(fw) || fw == 0x1320 ||
-       fw == 0x1340 || fw == 0x1342 || fw == 0x1360) &&
+  if ((PS5_FW_IS_11XX(fw) || PS5_FW_IS_12XX(fw) || fw == 0x1300 ||
+       fw == 0x1320 || fw == 0x1340 || fw == 0x1342 || fw == 0x1360) &&
       linux_i.kit_type == KIT_RETAIL_PRO) {
     uint64_t pro_base = derive_h() + HV_CODE_OFFSET_PRO;
     uint64_t hv_offset = pro_base - HV_BASE_REGULAR;
