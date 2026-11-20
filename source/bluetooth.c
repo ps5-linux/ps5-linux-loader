@@ -1,4 +1,5 @@
 #include "bluetooth.h"
+#include "utils.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -26,7 +27,7 @@ int dump_bluetooth_pairings(const char *boot_file_path) {
   const char *slash = strrchr(boot_file_path, '/');
   char output_path[512], temporary_path[512];
   uint8_t slots[BT_SLOT_COUNT][BT_SLOT_SIZE] = {0};
-  unsigned count = 0, skipped = 0;
+  unsigned count = 0, skipped = 0, unreadable = 0;
   int ret;
 
   if (!slash)
@@ -43,11 +44,17 @@ int dump_bluetooth_pairings(const char *boot_file_path) {
       (unlink(temporary_path) < 0 && errno != ENOENT))
     return -1;
 
+  /* An unreadable slot only drops that slot, not every pairing. Zeroed
+   * slots fail the paired-flag check below and are left out. */
   for (unsigned i = 0; i < BT_SLOT_COUNT; i++) {
     if (sceRegMgrGetBin(BT_INFO_KEY + i * 0x10000L, slots[i], BT_SLOT_SIZE)) {
-      memset(slots, 0, sizeof(slots));
-      return -1;
+      memset(slots[i], 0, BT_SLOT_SIZE);
+      unreadable++;
     }
+  }
+  if (unreadable == BT_SLOT_COUNT) {
+    memset(slots, 0, sizeof(slots));
+    return -1;
   }
 
   int fd = open(temporary_path, O_WRONLY | O_CREAT | O_EXCL, 0600);
@@ -110,5 +117,10 @@ int dump_bluetooth_pairings(const char *boot_file_path) {
     unlink(temporary_path);
     return -1;
   }
+  if (unreadable)
+    notify("Exported %u Bluetooth pairing(s), %u registry slot(s) unreadable\n",
+           count, unreadable);
+  else
+    notify("Exported %u Bluetooth pairing(s)\n", count);
   return 0;
 }
