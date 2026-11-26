@@ -6,6 +6,7 @@
 #include "loader_staging_1160.h"
 #include "utils.h"
 #include <fcntl.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
@@ -31,14 +32,17 @@ static const char *get_overridden_filename(const char *filename) {
     ssize_t size = find_and_get_size_of_file("path-override.txt", found_path);
     if (size > 0) {
       overrides_start = malloc(size + 1);
+      if (overrides_start == nullptr)
+        return filename;
       overrides_end = overrides_start + size + 1;
       if (read_file(found_path, overrides_start, size) == size) {
         state = 2;
-        for (char *p = overrides_start; p < overrides_end; p++)
-          if (*p == '\n')
-            *p = 0;
         // make sure the last string is null-terminated
         overrides_start[size] = 0;
+        // accept both LF and CRLF line endings
+        for (char *p = overrides_start; p < overrides_end; p++)
+          if (*p == '\n' || *p == '\r')
+            *p = 0;
       }
     }
   }
@@ -108,6 +112,41 @@ int read_file(const char *path, void *buf, size_t bufsize) {
   return r;
 }
 
+/* Some USB bridges/FAT paths report st_size == 0 for a valid file. The old code
+ * then asked mmap() for 0 bytes and got EINVAL ("could not allocate bzimage
+ * (0 bytes, errno 22)"). Read until EOF into a caller-sized cap and let the
+ * read() return value supply the real length. */
+static int read_file_until_eof(const char *path, void *buf, size_t max) {
+  int fd = open(path, O_RDONLY);
+  if (fd < 0)
+    return fd;
+  size_t total = 0;
+  while (total < max) {
+    ssize_t n = read(fd, (char *)buf + total, max - total);
+    if (n < 0) {
+      int e = errno;
+      close(fd);
+      errno = e;
+      return -1;
+    }
+    if (n == 0)
+      break;
+    total += (size_t)n;
+  }
+  /* Filled the whole buffer: make sure the file really ended there instead of
+   * silently returning a truncated kernel/initrd. */
+  if (total == max) {
+    char extra;
+    if (read(fd, &extra, 1) != 0) {
+      close(fd);
+      errno = EFBIG;
+      return -1;
+    }
+  }
+  close(fd);
+  return (int)total;
+}
+
 void trim_newline(char *s) {
   while (*s != '\0') {
     if (*s == '\r' || *s == '\n') {
@@ -122,47 +161,61 @@ int fetch_linux(struct linux_info *info) {
   char bzimage_path[256];
   char initrd_path[256];
 
-  size_t bzimage_size = find_and_get_size_of_file("bzImage", bzimage_path);
+  ssize_t bzimage_size = find_and_get_size_of_file("bzImage", bzimage_path);
   if (bzimage_size < 0) {
     notify("File bzImage not found at default paths - Aborting\n");
     return -1;
   }
 
-  void *bzimage =
-      mmap(NULL, ALIGN_UP(bzimage_size, PAGE_SIZE), PROT_READ | PROT_WRITE,
-           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  /* A valid file can still report st_size == 0 through some USB bridges/FAT
+   * paths; fall back to read-until-EOF and take the real length from read(). */
+  size_t bzimage_map = bzimage_size ? ALIGN_UP((size_t)bzimage_size, PAGE_SIZE)
+                                    : (64u << 20);
+  void *bzimage = mmap(NULL, bzimage_map, PROT_READ | PROT_WRITE,
+                       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   if (bzimage == MAP_FAILED) {
-    notify("[-] Error could not allocate bzimage.\n");
+    int e = errno;
+    notify("[-] Error could not allocate bzimage (%d bytes, errno %d).\n",
+           (int)bzimage_map, e);
     return -1;
   }
 
-  bzimage_size =
-      read_file(bzimage_path, bzimage, ALIGN_UP(bzimage_size, PAGE_SIZE));
-  if (bzimage_size < 0) {
+  int bzimage_got = read_file_until_eof(bzimage_path, bzimage, bzimage_map);
+  if (bzimage_got <= 0) {
     notify("Something went wrong while reading bzImage - Aborting\n");
     return -1;
   }
+  if (bzimage_size == 0)
+    notify("[*] bzImage stat size was 0; read %d bytes until EOF.\n",
+           bzimage_got);
+  bzimage_size = bzimage_got;
 
-  size_t initrd_size = find_and_get_size_of_file("initrd.img", initrd_path);
-  if (bzimage_size < 0) {
-    notify("File bzImage not found at default paths - Aborting\n");
-    return -1;
-  }
-
-  void *initrd =
-      mmap(NULL, ALIGN_UP(initrd_size, PAGE_SIZE), PROT_READ | PROT_WRITE,
-           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  if (initrd == MAP_FAILED) {
-    notify("[-] Error could not allocate initrd.\n");
-    return -1;
-  }
-
-  initrd_size =
-      read_file(initrd_path, initrd, ALIGN_UP(initrd_size, PAGE_SIZE));
+  ssize_t initrd_size = find_and_get_size_of_file("initrd.img", initrd_path);
   if (initrd_size < 0) {
+    notify("File initrd.img not found at default paths - Aborting\n");
+    return -1;
+  }
+
+  size_t initrd_map = initrd_size ? ALIGN_UP((size_t)initrd_size, PAGE_SIZE)
+                                  : (512u << 20);
+  void *initrd = mmap(NULL, initrd_map, PROT_READ | PROT_WRITE,
+                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  if (initrd == MAP_FAILED) {
+    int e = errno;
+    notify("[-] Error could not allocate initrd (%d bytes, errno %d).\n",
+           (int)initrd_map, e);
+    return -1;
+  }
+
+  int initrd_got = read_file_until_eof(initrd_path, initrd, initrd_map);
+  if (initrd_got <= 0) {
     notify("Something went wrong while reading initrd - Aborting\n");
     return -1;
   }
+  if (initrd_size == 0)
+    notify("[*] initrd stat size was 0; read %d bytes until EOF.\n",
+           initrd_got);
+  initrd_size = initrd_got;
 
   if (dump_device_firmwares(initrd_path) < 0) {
     notify(

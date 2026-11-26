@@ -808,6 +808,9 @@ offset_list off_1100 = {
     .HV_EFI_MAP_ROOT = 0x3DCD0C8,
     .PS5_WIFI_FW_OFFSET = 0x1586110,
     .PS5_WIFI_FW_SIZE = 0x799BC,
+    /* Pro GPU table: derived from retail 16 GB images. PS5 Pro is 16 GB
+     * retail only; never substitute devkit (32 GB) values here. */
+    .PS5_PRO_GPU_FW_OFFSET = 0x257F4D0,
 };
 
 offset_list off_1120 = {
@@ -852,6 +855,7 @@ offset_list off_1120 = {
     .HV_EFI_MAP_ROOT = 0x3DCD0C8,
     .PS5_WIFI_FW_OFFSET = 0x1586110,
     .PS5_WIFI_FW_SIZE = 0x799BC,
+    .PS5_PRO_GPU_FW_OFFSET = 0x257F4D0,
 };
 
 offset_list off_1140 = {
@@ -896,6 +900,7 @@ offset_list off_1140 = {
     .HV_EFI_MAP_ROOT = 0x3DCD0C8,
     .PS5_WIFI_FW_OFFSET = 0x15860D0,
     .PS5_WIFI_FW_SIZE = 0x799BC,
+    .PS5_PRO_GPU_FW_OFFSET = 0x257F4F0,
 };
 
 offset_list off_1160 = {
@@ -1226,6 +1231,7 @@ offset_list off_1200 = {
     .RESERVED_57 = 0x0,
     .NVS_SIGNATURE = 0x1A8A900,
     .HV_EFI_MAP_ROOT = 0x3E0D070,
+    .PS5_PRO_GPU_FW_OFFSET = 0x25A0AA0,
 };
 
 offset_list off_1202 = {
@@ -1289,6 +1295,7 @@ offset_list off_1202 = {
     .RESERVED_57 = 0x0,
     .NVS_SIGNATURE = 0x1A8A900,
     .HV_EFI_MAP_ROOT = 0x3E0D070,
+    .PS5_PRO_GPU_FW_OFFSET = 0x25A0AA0,
 };
 
 offset_list off_1220 = {
@@ -1352,6 +1359,7 @@ offset_list off_1220 = {
     .RESERVED_57 = 0,
     .NVS_SIGNATURE = 0x1A8A900,
     .HV_EFI_MAP_ROOT = 0x3E0D070,
+    .PS5_PRO_GPU_FW_OFFSET = 0x25A0AA0,
 };
 
 offset_list off_1240 = {
@@ -1415,6 +1423,7 @@ offset_list off_1240 = {
     .RESERVED_57 = 0,
     .NVS_SIGNATURE = 0x1A8A900,
     .HV_EFI_MAP_ROOT = 0x3E0D070,
+    .PS5_PRO_GPU_FW_OFFSET = 0x25A0AA0,
 };
 
 offset_list off_1270 = {
@@ -1478,6 +1487,7 @@ offset_list off_1270 = {
     .RESERVED_57 = 0x0,
     .NVS_SIGNATURE = 0x1A8A900,
     .HV_EFI_MAP_ROOT = 0x3E0D070,
+    .PS5_PRO_GPU_FW_OFFSET = 0x25A0AA0,
 };
 
 offset_list off_1300 = {
@@ -1648,6 +1658,7 @@ offset_list off_1340 = {
     .FUN_PRINTF = 0x25D3F0,
     .FUN_SMP_NO_RENDEVOUS_BARRIER = 0x261F38,
     .MP_STARTUP_INIT_VECTOR = 0x268D08,
+    .PS5_PRO_GPU_FW_OFFSET = 0x25143D0,
 };
 
 offset_list off_1342 = {
@@ -1704,6 +1715,7 @@ offset_list off_1342 = {
     .FUN_PRINTF = 0x25D360,
     .FUN_SMP_NO_RENDEVOUS_BARRIER = 0x263AC8,
     .MP_STARTUP_INIT_VECTOR = 0x2687D8,
+    .PS5_PRO_GPU_FW_OFFSET = 0x25143D0,
 };
 
 offset_list off_1360 = {
