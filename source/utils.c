@@ -30,6 +30,13 @@ int set_offsets(void) {
   fw = (kernel_get_fw_version() >> 0x10) & 0xFFFF;
   if (fw == 0)
     return -1;
+  /* PS5 Pro units are all 16 GB retail hardware. Their tables are derived
+   * from retail 16 GB images only; devkit-derived (32 GB) offsets must never
+   * be applied to KIT_RETAIL_PRO. Pro support starts at 11.00. */
+  if (get_kit_type() == KIT_RETAIL_PRO && fw < 0x1100) {
+    notify("No retail Pro offset table for firmware 0x%04X\n", fw);
+    return -1;
+  }
   switch (fw) {
   case 0x0300:
     env_offset = off_0300;
