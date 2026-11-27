@@ -221,6 +221,16 @@ Then, there are certain settings and commands we recommend doing:
    sudo ./install.sh
    ```
 
+### MediaTek MT7921 Wi-Fi
+
+If `lspci -nn` reports MediaTek `[14c3:7961]`, the internal adapter uses
+the Linux `mt7921e` driver. On affected consoles, enabling the adapter
+with an unpatched kernel can take down USB and Ethernet and power off
+the console. Use a kernel build that includes the PS5-specific MT7921
+power-management fix. Keep wired Ethernet available while validating
+Wi-Fi on a new kernel. See [issue #70](https://github.com/ps5-linux/ps5-linux-loader/issues/70)
+for hardware reports and the kernel-side workaround.
+
 ## M.2 installation
 
 You can use a M.2 SSD exclusively for Linux (which means you cannot use it for PS5 game storage).
